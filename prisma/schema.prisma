@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Entry {
+  id        String   @id @default(cuid())
+  sessionId String
+  text      String
+  category  String // "todo" | "idea" | "thought"
+  label     String? // life-area label, todos only
+  completed Boolean  @default(false)
+  dueDate   DateTime? // when the task is due, if mentioned or set explicitly; falls back to createdAt's day when null
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([dueDate])
+  @@index([category])
+}

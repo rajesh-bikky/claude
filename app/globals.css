@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  /* ElevenLabs-inspired design tokens (see DESIGN.md) */
+  --raw-primary: #292524;
+  --raw-primary-active: #0c0a09;
+  --raw-ink: #0c0a09;
+  --raw-body: #4e4e4e;
+  --raw-body-strong: #292524;
+  --raw-muted: #777169;
+  --raw-muted-soft: #a8a29e;
+  --raw-hairline: #e7e5e4;
+  --raw-hairline-soft: #f0efed;
+  --raw-hairline-strong: #d6d3d1;
+  --raw-canvas: #f5f5f5;
+  --raw-canvas-soft: #fafafa;
+  --raw-canvas-deep: #0c0a09;
+  --raw-surface-card: #ffffff;
+  --raw-surface-strong: #f0efed;
+  --raw-surface-dark: #0c0a09;
+  --raw-surface-dark-elevated: #1c1917;
+  --raw-on-primary: #ffffff;
+  --raw-on-dark: #ffffff;
+  --raw-on-dark-soft: #a8a29e;
+  --raw-gradient-mint: #a7e5d3;
+  --raw-gradient-peach: #f4c5a8;
+  --raw-gradient-lavender: #c8b8e0;
+  --raw-gradient-sky: #a8c8e8;
+  --raw-gradient-rose: #e8b8c4;
+  --raw-success: #16a34a;
+  --raw-error: #dc2626;
+
+  --raw-font-display: var(--font-display-serif), "Times New Roman", serif;
+  --raw-font-body: var(--font-inter), sans-serif;
+
+  --raw-radius-xs: 4px;
+  --raw-radius-sm: 6px;
+  --raw-radius-md: 8px;
+  --raw-radius-lg: 12px;
+  --raw-radius-xl: 16px;
+  --raw-radius-xxl: 24px;
+  --raw-radius-pill: 9999px;
+}
+
+@theme inline {
+  --color-primary: var(--raw-primary);
+  --color-primary-active: var(--raw-primary-active);
+  --color-ink: var(--raw-ink);
+  --color-body: var(--raw-body);
+  --color-body-strong: var(--raw-body-strong);
+  --color-muted: var(--raw-muted);
+  --color-muted-soft: var(--raw-muted-soft);
+  --color-hairline: var(--raw-hairline);
+  --color-hairline-soft: var(--raw-hairline-soft);
+  --color-hairline-strong: var(--raw-hairline-strong);
+  --color-canvas: var(--raw-canvas);
+  --color-canvas-soft: var(--raw-canvas-soft);
+  --color-canvas-deep: var(--raw-canvas-deep);
+  --color-surface-card: var(--raw-surface-card);
+  --color-surface-strong: var(--raw-surface-strong);
+  --color-surface-dark: var(--raw-surface-dark);
+  --color-surface-dark-elevated: var(--raw-surface-dark-elevated);
+  --color-on-primary: var(--raw-on-primary);
+  --color-on-dark: var(--raw-on-dark);
+  --color-on-dark-soft: var(--raw-on-dark-soft);
+  --color-gradient-mint: var(--raw-gradient-mint);
+  --color-gradient-peach: var(--raw-gradient-peach);
+  --color-gradient-lavender: var(--raw-gradient-lavender);
+  --color-gradient-sky: var(--raw-gradient-sky);
+  --color-gradient-rose: var(--raw-gradient-rose);
+  --color-success: var(--raw-success);
+  --color-error: var(--raw-error);
+
+  --font-display: var(--raw-font-display);
+  --font-body: var(--raw-font-body);
+
+  --radius-xs: var(--raw-radius-xs);
+  --radius-sm: var(--raw-radius-sm);
+  --radius-md: var(--raw-radius-md);
+  --radius-lg: var(--raw-radius-lg);
+  --radius-xl: var(--raw-radius-xl);
+  --radius-xxl: var(--raw-radius-xxl);
+  --radius-pill: var(--raw-radius-pill);
+}
+
+body {
+  background: var(--raw-canvas);
+  color: var(--raw-ink);
+  font-family: var(--raw-font-body);
+  letter-spacing: 0.16px;
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--raw-font-display);
+  font-weight: 400;
+}
+
+/* Atmospheric gradient orb, used sparingly as pure decoration */
+.gradient-orb {
+  background: radial-gradient(
+    circle at 50% 50%,
+    var(--orb-color, var(--raw-gradient-mint)),
+    transparent 70%
+  );
+  filter: blur(40px);
+  opacity: 0.55;
+  pointer-events: none;
+}
