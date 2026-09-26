@@ -153,6 +153,19 @@ export default function BrowsePage() {
     [refreshAfterMutation],
   );
 
+  const handleToggleSpinoff = useCallback(
+    async (entry: Entry) => {
+      const next = entry.spinoffStatus === "requested" ? null : "requested";
+      await fetch(`/api/entries/${entry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spinoffStatus: next }),
+      });
+      refreshAfterMutation();
+    },
+    [refreshAfterMutation],
+  );
+
   const goToMonth = (delta: number) => {
     const d = new Date(year, month + delta, 1);
     setYear(d.getFullYear());
@@ -206,6 +219,7 @@ export default function BrowsePage() {
             onToggleComplete={handleToggleComplete}
             onDelete={handleDelete}
             onUpdateDueDate={handleUpdateDueDate}
+            onToggleSpinoff={handleToggleSpinoff}
           />
         </Section>
       )}
@@ -219,6 +233,7 @@ export default function BrowsePage() {
             onToggleComplete={handleToggleComplete}
             onDelete={handleDelete}
             onUpdateDueDate={handleUpdateDueDate}
+            onToggleSpinoff={handleToggleSpinoff}
           />
         </Section>
       )}
@@ -232,6 +247,7 @@ export default function BrowsePage() {
             onToggleComplete={handleToggleComplete}
             onDelete={handleDelete}
             onUpdateDueDate={handleUpdateDueDate}
+            onToggleSpinoff={handleToggleSpinoff}
           />
         </Section>
       )}
@@ -306,6 +322,7 @@ export default function BrowsePage() {
               onToggleComplete={handleToggleComplete}
               onDelete={handleDelete}
               onUpdateDueDate={handleUpdateDueDate}
+              onToggleSpinoff={handleToggleSpinoff}
             />
           </div>
         </>
@@ -343,6 +360,7 @@ function EntryList({
   onToggleComplete,
   onDelete,
   onUpdateDueDate,
+  onToggleSpinoff,
 }: {
   entries: Entry[];
   loading: boolean;
@@ -350,6 +368,7 @@ function EntryList({
   onToggleComplete: (entry: Entry) => void;
   onDelete: (entry: Entry) => void;
   onUpdateDueDate: (entry: Entry, dueDate: string) => void;
+  onToggleSpinoff: (entry: Entry) => void;
 }) {
   if (loading) return <p className="text-[14px] text-muted">Loading…</p>;
   if (entries.length === 0) return <p className="text-[14px] text-muted">{empty}</p>;
@@ -362,6 +381,7 @@ function EntryList({
           onToggleComplete={onToggleComplete}
           onDelete={onDelete}
           onUpdateDueDate={onUpdateDueDate}
+          onToggleSpinoff={onToggleSpinoff}
         />
       ))}
     </ul>

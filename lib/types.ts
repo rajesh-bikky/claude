@@ -8,6 +8,8 @@ export type Entry = {
   label: string | null;
   completed: boolean;
   dueDate: string | null;
+  spinoffStatus: string | null;
+  spinoffPath: string | null;
   createdAt: string;
 };
 

@@ -1,7 +1,6 @@
 import { randomUUID } from "crypto";
 import { db } from "@/lib/db";
 import { categorizeTranscript, categorizeAudio, type CategorizedEntry } from "@/lib/categorize";
-import { convertToWav } from "@/lib/audio";
 
 async function getExistingLabels(): Promise<string[]> {
   const rows = await db.entry.findMany({
@@ -56,15 +55,14 @@ export async function saveTranscript(transcript: string) {
 }
 
 export async function saveAudio(audio: Buffer, mimeType: string) {
-  const wav = await convertToWav(audio, mimeType);
   const existingLabels = await getExistingLabels();
 
   let categorized: CategorizedEntry[];
   try {
-    categorized = await categorizeAudio(wav, "audio/wav", existingLabels);
+    categorized = await categorizeAudio(audio, mimeType, existingLabels);
   } catch (err) {
     console.error("Categorization failed, retrying once:", err);
-    categorized = await categorizeAudio(wav, "audio/wav", existingLabels);
+    categorized = await categorizeAudio(audio, mimeType, existingLabels);
   }
 
   if (categorized.length === 0) {

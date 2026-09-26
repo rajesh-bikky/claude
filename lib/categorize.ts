@@ -25,9 +25,11 @@ function systemInstructionFor(today: Date): string {
     "rather than one big blob. Transcribe accurately: preserve the speaker's actual words and intent rather " +
     "than guessing at a plausible-sounding sentence. If a short stretch of audio is unclear, transcribe your " +
     "best interpretation rather than inventing unrelated content.\n\n" +
-    `Today is ${todayStr}. If the speaker mentions when something is due or should happen (e.g. "tomorrow", ` +
-    '"next Friday", "in two weeks", "by the 5th"), resolve it to an absolute calendar date relative to today ' +
-    "and put it in dueDate as YYYY-MM-DD. If no date or timeframe is mentioned for a thought, leave dueDate empty — do not guess a date."
+    `Today is ${todayStr}. Only 'todo' entries can have a due date. If the speaker mentions when a to-do is due ` +
+    '(e.g. "tomorrow", "next Friday", "in two weeks", "by the 5th"), resolve it to an absolute calendar date ' +
+    "relative to today and put it in dueDate as YYYY-MM-DD. If no date is mentioned, leave dueDate empty — do not " +
+    "guess one. Never set dueDate for 'idea' or 'thought' entries, even if a date happens to be mentioned near them — " +
+    "a due date doesn't apply to those."
   );
 }
 
@@ -58,7 +60,7 @@ const responseSchema = {
           dueDate: {
             type: Type.STRING,
             description:
-              "The resolved absolute due date as YYYY-MM-DD, only if the speaker actually referenced a date/timeframe for this thought. Empty string if no date was mentioned.",
+              "Only for category='todo': the resolved absolute due date as YYYY-MM-DD, only if the speaker actually referenced a date/timeframe. Empty string if no date was mentioned, or if category is 'idea' or 'thought'.",
           },
         },
         required: ["text", "category", "label", "dueDate"],
@@ -89,7 +91,11 @@ function parseEntries(raw: string | undefined): CategorizedEntry[] {
       text: e.text.trim(),
       category: e.category as Category,
       label: e.category === "todo" && e.label?.trim() ? e.label.trim() : null,
-      dueDate: e.dueDate && DATE_RE.test(e.dueDate.trim()) ? e.dueDate.trim() : null,
+      // Due dates only make sense for todos — enforced here regardless of what the model returns.
+      dueDate:
+        e.category === "todo" && e.dueDate && DATE_RE.test(e.dueDate.trim())
+          ? e.dueDate.trim()
+          : null,
     }));
 }
 

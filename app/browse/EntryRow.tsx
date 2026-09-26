@@ -22,16 +22,22 @@ function dueLabel(dateKey: string) {
   return `Due ${date.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
+function spinoffFolderName(path: string) {
+  return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
+}
+
 export function EntryRow({
   entry,
   onToggleComplete,
   onDelete,
   onUpdateDueDate,
+  onToggleSpinoff,
 }: {
   entry: Entry;
   onToggleComplete: (entry: Entry) => void;
   onDelete: (entry: Entry) => void;
   onUpdateDueDate: (entry: Entry, dueDate: string) => void;
+  onToggleSpinoff: (entry: Entry) => void;
 }) {
   const effectiveDateKey = toDateInputValue(
     entry.dueDate ? new Date(entry.dueDate) : new Date(entry.createdAt),
@@ -90,16 +96,48 @@ export function EntryRow({
             </span>
           )}
 
-          <span className="relative inline-flex items-center rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[11px] font-medium text-ink">
-            {dueLabel(effectiveDateKey)}
-            <input
-              type="date"
-              value={effectiveDateKey}
-              onChange={(e) => e.target.value && onUpdateDueDate(entry, e.target.value)}
-              aria-label="Change due date"
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-            />
-          </span>
+          {entry.category === "todo" && (
+            <span className="relative inline-flex items-center rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[11px] font-medium text-ink">
+              {dueLabel(effectiveDateKey)}
+              <input
+                type="date"
+                value={effectiveDateKey}
+                onChange={(e) => e.target.value && onUpdateDueDate(entry, e.target.value)}
+                aria-label="Change due date"
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </span>
+          )}
+
+          {entry.category === "idea" && (
+            <>
+              {!entry.spinoffStatus && (
+                <button
+                  onClick={() => onToggleSpinoff(entry)}
+                  className="rounded-pill border border-hairline-strong px-2.5 py-0.5 text-[11px] font-medium text-ink"
+                >
+                  Spin off
+                </button>
+              )}
+              {entry.spinoffStatus === "requested" && (
+                <button
+                  onClick={() => onToggleSpinoff(entry)}
+                  aria-label="Cancel spin-off request"
+                  className="rounded-pill bg-surface-strong px-2.5 py-0.5 text-[11px] font-medium text-body"
+                >
+                  Spin-off requested…
+                </button>
+              )}
+              {entry.spinoffStatus === "created" && (
+                <span
+                  title={entry.spinoffPath ?? undefined}
+                  className="rounded-pill bg-surface-strong px-2.5 py-0.5 text-[11px] font-medium text-body"
+                >
+                  Project ready{entry.spinoffPath ? `: ${spinoffFolderName(entry.spinoffPath)}` : ""}
+                </span>
+              )}
+            </>
+          )}
 
           <span className="text-[12px] text-muted">captured {capturedAt}</span>
         </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const SPINOFF_STATUSES = ["requested", "created"] as const;
 
 export async function PATCH(
   request: NextRequest,
@@ -10,7 +11,12 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json();
 
-  const data: { completed?: boolean; dueDate?: Date | null } = {};
+  const data: {
+    completed?: boolean;
+    dueDate?: Date | null;
+    spinoffStatus?: string | null;
+    spinoffPath?: string | null;
+  } = {};
 
   if ("completed" in body) {
     if (typeof body.completed !== "boolean") {
@@ -27,6 +33,23 @@ export async function PATCH(
     } else {
       return NextResponse.json({ error: "dueDate must be YYYY-MM-DD or null" }, { status: 400 });
     }
+  }
+
+  if ("spinoffStatus" in body) {
+    if (body.spinoffStatus === null) {
+      data.spinoffStatus = null;
+    } else if (
+      typeof body.spinoffStatus === "string" &&
+      (SPINOFF_STATUSES as readonly string[]).includes(body.spinoffStatus)
+    ) {
+      data.spinoffStatus = body.spinoffStatus;
+    } else {
+      return NextResponse.json({ error: "spinoffStatus must be requested, created, or null" }, { status: 400 });
+    }
+  }
+
+  if ("spinoffPath" in body) {
+    data.spinoffPath = body.spinoffPath === null ? null : String(body.spinoffPath);
   }
 
   if (Object.keys(data).length === 0) {
