@@ -5,11 +5,16 @@ import Link from "next/link";
 import type { Entry } from "@/lib/types";
 import { CalendarGrid } from "./CalendarGrid";
 import { EntryRow } from "./EntryRow";
-import { Dashboard } from "./Dashboard";
+import { Dashboard, type DashboardDrilldown } from "./Dashboard";
 
-type View = "overview" | "day" | "search" | "label";
+type View = "overview" | "day" | "search" | "label" | "drilldown";
 type OverviewTab = "calendar" | "dashboard";
-type DashboardStats = { top: { label: string; count: number }[]; otherCount: number; total: number };
+type DashboardStats = {
+  top: { label: string; count: number }[];
+  otherCount: number;
+  total: number;
+  ideaCount: number;
+};
 
 export default function BrowsePage() {
   const now = new Date();
@@ -22,8 +27,10 @@ export default function BrowsePage() {
     top: [],
     otherCount: 0,
     total: 0,
+    ideaCount: 0,
   });
   const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardDrilldown, setDashboardDrilldown] = useState<DashboardDrilldown | null>(null);
 
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
@@ -31,6 +38,7 @@ export default function BrowsePage() {
   const [searchInput, setSearchInput] = useState("");
 
   const [recent, setRecent] = useState<Entry[]>([]);
+  const [completedEntries, setCompletedEntries] = useState<Entry[]>([]);
   const [viewEntries, setViewEntries] = useState<Entry[]>([]);
   const [labels, setLabels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,7 +49,9 @@ export default function BrowsePage() {
       ? "day"
       : selectedLabel
         ? "label"
-        : "overview";
+        : dashboardDrilldown
+          ? "drilldown"
+          : "overview";
 
   // Debounce search input -> searchQuery
   useEffect(() => {
@@ -65,7 +75,12 @@ export default function BrowsePage() {
     fetch("/api/dashboard")
       .then((r) => r.json())
       .then((data) =>
-        setDashboardStats({ top: data.top ?? [], otherCount: data.otherCount ?? 0, total: data.total ?? 0 }),
+        setDashboardStats({
+          top: data.top ?? [],
+          otherCount: data.otherCount ?? 0,
+          total: data.total ?? 0,
+          ideaCount: data.ideaCount ?? 0,
+        }),
       )
       .finally(() => setDashboardLoading(false));
   }, []);
@@ -75,9 +90,9 @@ export default function BrowsePage() {
     if (view === "overview" && overviewTab === "dashboard") refreshDashboard();
   }, [view, overviewTab, refreshDashboard]);
 
-  // Recent feed (always fetched, shown on overview)
+  // Recent feed: open items only — completed items live in their own section.
   const refreshRecent = useCallback(() => {
-    fetch("/api/entries?recent=8")
+    fetch("/api/entries?recent=8&completed=false")
       .then((r) => r.json())
       .then((data) => {
         setRecent(data.entries ?? []);
@@ -85,9 +100,16 @@ export default function BrowsePage() {
       });
   }, []);
 
+  const refreshCompleted = useCallback(() => {
+    fetch("/api/entries?recent=8&completed=true")
+      .then((r) => r.json())
+      .then((data) => setCompletedEntries(data.entries ?? []));
+  }, []);
+
   useEffect(() => {
     refreshRecent();
-  }, [refreshRecent]);
+    refreshCompleted();
+  }, [refreshRecent, refreshCompleted]);
 
   // Data for the active view
   const refreshViewEntries = useCallback(() => {
@@ -103,11 +125,25 @@ export default function BrowsePage() {
       params.set("category", "todo");
       params.set("label", selectedLabel);
     }
+    if (view === "drilldown" && dashboardDrilldown) {
+      params.set("completed", "false");
+      if (dashboardDrilldown.kind === "label") {
+        params.set("category", "todo");
+        params.set("label", dashboardDrilldown.label);
+      } else if (dashboardDrilldown.kind === "other") {
+        params.set("category", "todo");
+        if (dashboardDrilldown.excludeLabels.length > 0) {
+          params.set("excludeLabels", dashboardDrilldown.excludeLabels.join(","));
+        }
+      } else if (dashboardDrilldown.kind === "ideas") {
+        params.set("category", "idea");
+      }
+    }
     fetch(`/api/entries?${params.toString()}`)
       .then((r) => r.json())
       .then((data) => setViewEntries(data.entries ?? []))
       .finally(() => setLoading(false));
-  }, [view, searchQuery, selectedDay, selectedLabel]);
+  }, [view, searchQuery, selectedDay, selectedLabel, dashboardDrilldown]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-in-effect, per react.dev/learn/you-might-not-need-an-effect
@@ -116,10 +152,11 @@ export default function BrowsePage() {
 
   const refreshAfterMutation = useCallback(() => {
     refreshRecent();
+    refreshCompleted();
     refreshCounts();
     refreshViewEntries();
     if (overviewTab === "dashboard") refreshDashboard();
-  }, [refreshRecent, refreshCounts, refreshViewEntries, overviewTab, refreshDashboard]);
+  }, [refreshRecent, refreshCompleted, refreshCounts, refreshViewEntries, overviewTab, refreshDashboard]);
 
   const handleToggleComplete = useCallback(
     async (entry: Entry) => {
@@ -175,6 +212,7 @@ export default function BrowsePage() {
   const clearFilters = () => {
     setSelectedDay(null);
     setSelectedLabel(null);
+    setDashboardDrilldown(null);
     setSearchInput("");
     setSearchQuery("");
     refreshRecent();
@@ -188,6 +226,13 @@ export default function BrowsePage() {
       day: "numeric",
     });
   }, [selectedDay]);
+
+  const drilldownTitle = useMemo(() => {
+    if (!dashboardDrilldown) return "";
+    if (dashboardDrilldown.kind === "label") return `Outstanding: ${dashboardDrilldown.label}`;
+    if (dashboardDrilldown.kind === "other") return "Outstanding: Other";
+    return "Outstanding ideas";
+  }, [dashboardDrilldown]);
 
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-28 pt-8">
@@ -252,6 +297,20 @@ export default function BrowsePage() {
         </Section>
       )}
 
+      {view === "drilldown" && (
+        <Section title={drilldownTitle} onClear={clearFilters}>
+          <EntryList
+            entries={viewEntries}
+            loading={loading}
+            empty="Nothing here."
+            onToggleComplete={handleToggleComplete}
+            onDelete={handleDelete}
+            onUpdateDueDate={handleUpdateDueDate}
+            onToggleSpinoff={handleToggleSpinoff}
+          />
+        </Section>
+      )}
+
       {view === "overview" && (
         <>
           <div className="mb-6 inline-flex rounded-pill border border-hairline-strong p-1">
@@ -288,7 +347,9 @@ export default function BrowsePage() {
               top={dashboardStats.top}
               otherCount={dashboardStats.otherCount}
               total={dashboardStats.total}
+              ideaCount={dashboardStats.ideaCount}
               loading={dashboardLoading}
+              onSelect={setDashboardDrilldown}
             />
           )}
 
@@ -325,6 +386,23 @@ export default function BrowsePage() {
               onToggleSpinoff={handleToggleSpinoff}
             />
           </div>
+
+          {completedEntries.length > 0 && (
+            <div className="mt-8">
+              <h3 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted">
+                Completed
+              </h3>
+              <EntryList
+                entries={completedEntries}
+                loading={false}
+                empty=""
+                onToggleComplete={handleToggleComplete}
+                onDelete={handleDelete}
+                onUpdateDueDate={handleUpdateDueDate}
+                onToggleSpinoff={handleToggleSpinoff}
+              />
+            </div>
+          )}
         </>
       )}
     </main>

@@ -2,13 +2,13 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
 export async function GET() {
-  const outstanding = await db.entry.findMany({
-    where: { category: "todo", completed: false },
-    select: { label: true },
-  });
+  const [outstandingTodos, outstandingIdeas] = await Promise.all([
+    db.entry.findMany({ where: { category: "todo", completed: false }, select: { label: true } }),
+    db.entry.count({ where: { category: "idea", completed: false } }),
+  ]);
 
   const counts = new Map<string, number>();
-  for (const { label } of outstanding) {
+  for (const { label } of outstandingTodos) {
     const key = label?.trim() || "Other";
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
@@ -20,6 +20,7 @@ export async function GET() {
   return NextResponse.json({
     top,
     otherCount,
-    total: outstanding.length,
+    total: outstandingTodos.length,
+    ideaCount: outstandingIdeas,
   });
 }

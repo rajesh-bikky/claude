@@ -45,6 +45,8 @@ export async function GET(request: NextRequest) {
   const search = params.get("search")?.trim();
   const category = params.get("category");
   const label = params.get("label");
+  const excludeLabels = params.get("excludeLabels");
+  const completed = params.get("completed");
   const recent = params.get("recent");
 
   const and: Prisma.EntryWhereInput[] = [];
@@ -54,6 +56,8 @@ export async function GET(request: NextRequest) {
   }
   if (category) and.push({ category });
   if (label) and.push({ label });
+  if (excludeLabels) and.push({ label: { notIn: excludeLabels.split(",") } });
+  if (completed !== null) and.push({ completed: completed === "true" });
   if (search) {
     and.push({ OR: [{ text: { contains: search } }, { label: { contains: search } }] });
   }
