@@ -237,7 +237,7 @@ export default function BrowsePage() {
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-28 pt-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-display text-3xl text-ink">Thoughtline</h1>
+        <h1 className="font-display text-3xl text-ink">Cerebrew</h1>
         <Link
           href="/capture"
           className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-on-primary"

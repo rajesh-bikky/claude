@@ -1,4 +1,4 @@
-// Polls Thoughtline for ideas flagged "Spin off", and turns each one into a
+// Polls Cerebrew for ideas flagged "Spin off", and turns each one into a
 // real, independent project folder — seeded with the idea and instructed to
 // start with the interview-me skill before any code gets written.
 //
@@ -9,7 +9,7 @@ import { createHash } from "crypto";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 
-const THOUGHTLINE_URL = process.env.THOUGHTLINE_URL ?? "http://localhost:3000";
+const CEREBREW_URL = process.env.CEREBREW_URL ?? "http://localhost:3000";
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? "C:\\Users\\Student\\Desktop\\Claude";
 const ENV_LOCAL_PATH = path.join(import.meta.dirname, "..", ".env.local");
 
@@ -21,8 +21,8 @@ async function readAuthCode() {
 }
 
 async function authCookie(code) {
-  const digest = createHash("sha256").update(`thoughtline:${code}`).digest("hex");
-  return `thoughtline_auth=${digest}`;
+  const digest = createHash("sha256").update(`cerebrew:${code}`).digest("hex");
+  return `cerebrew_auth=${digest}`;
 }
 
 function slugify(text) {
@@ -61,7 +61,7 @@ function seedContent(entry) {
   const captured = new Date(entry.createdAt).toLocaleString();
   return `# Idea: ${entry.text.slice(0, 60)}${entry.text.length > 60 ? "…" : ""}
 
-Captured from Thoughtline on ${captured}.
+Captured from Cerebrew on ${captured}.
 
 > ${entry.text}
 
@@ -75,7 +75,7 @@ async function main() {
   const code = await readAuthCode();
   const cookie = await authCookie(code);
 
-  const res = await fetch(`${THOUGHTLINE_URL}/api/spinoffs`, {
+  const res = await fetch(`${CEREBREW_URL}/api/spinoffs`, {
     headers: { Cookie: cookie },
   });
   if (!res.ok) {
@@ -93,7 +93,7 @@ async function main() {
     const folder = await uniqueFolder(PROJECTS_ROOT, slug);
     await writeFile(path.join(folder, "CLAUDE.md"), seedContent(entry), "utf-8");
 
-    const patchRes = await fetch(`${THOUGHTLINE_URL}/api/entries/${entry.id}`, {
+    const patchRes = await fetch(`${CEREBREW_URL}/api/entries/${entry.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: cookie },
       body: JSON.stringify({ spinoffStatus: "created", spinoffPath: folder }),

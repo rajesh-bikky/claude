@@ -1,19 +1,47 @@
-// One-off script: rasterizes the app icon (ink pill + mic glyph, per DESIGN.md)
-// into the PNG sizes needed for the PWA manifest and iOS Home Screen icon.
+// One-off script: rasterizes the Cerebrew app icon (a brain meshed with a
+// gear, plus a thought-bubble dot trail) into the PNG sizes needed for the
+// PWA manifest and iOS Home Screen icon.
 // Run with: node scripts/generate-icons.mjs
 import sharp from "sharp";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
+const INK = "#0c0a09";
+
+function gearTeeth(cx, cy, radius, count) {
+  const toothW = 26;
+  const toothH = 36;
+  let out = "";
+  for (let i = 0; i < count; i++) {
+    const angle = (360 / count) * i;
+    out += `<rect x="${cx - toothW / 2}" y="${cy - radius - toothH / 2}" width="${toothW}" height="${toothH}" rx="4" fill="#ffffff" transform="rotate(${angle} ${cx} ${cy})"/>\n`;
+  }
+  return out;
+}
+
 const svg = (size) => `
 <svg width="${size}" height="${size}" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="112" fill="#0c0a09"/>
-  <g transform="translate(256 246)" fill="#ffffff">
-    <rect x="-42" y="-120" width="84" height="150" rx="42"/>
-    <path d="M -100 -10 A 100 100 0 0 0 100 -10" stroke="#ffffff" stroke-width="22" fill="none" stroke-linecap="round"/>
-    <rect x="-11" y="90" width="22" height="60" rx="11"/>
-    <rect x="-60" y="140" width="120" height="22" rx="11"/>
-  </g>
+  <rect width="512" height="512" rx="112" fill="${INK}"/>
+
+  <!-- gear ring -->
+  <circle cx="230" cy="220" r="138" stroke="#ffffff" stroke-width="20" fill="none"/>
+  ${gearTeeth(230, 220, 150, 8)}
+
+  <!-- brain: two lobes -->
+  <circle cx="200" cy="220" r="62" fill="#ffffff"/>
+  <circle cx="260" cy="220" r="62" fill="#ffffff"/>
+  <!-- cleft between hemispheres -->
+  <rect x="227" y="168" width="6" height="104" fill="${INK}"/>
+  <!-- fold lines -->
+  <path d="M 178 198 Q 194 210 178 226" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M 282 198 Q 266 210 282 226" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M 190 244 Q 200 252 212 246" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M 250 246 Q 262 252 272 244" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>
+
+  <!-- thought-bubble dot trail -->
+  <circle cx="348" cy="348" r="22" fill="#ffffff"/>
+  <circle cx="390" cy="388" r="14" fill="#ffffff"/>
+  <circle cx="416" cy="418" r="8" fill="#ffffff"/>
 </svg>`;
 
 const outDir = path.resolve("public", "icons");

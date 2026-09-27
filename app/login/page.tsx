@@ -13,7 +13,7 @@ export default async function LoginPage({
     <main className="flex min-h-screen flex-1 items-center justify-center bg-canvas px-6">
       <div className="w-full max-w-sm">
         <div className="mb-10 text-center">
-          <h1 className="font-display text-5xl text-ink">Thoughtline</h1>
+          <h1 className="font-display text-5xl text-ink">Cerebrew</h1>
           <p className="mt-3 text-body text-[15px]">
             Enter your 4-digit code to continue.
           </p>

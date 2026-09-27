@@ -1,7 +1,7 @@
 {
-  "name": "Thoughtline",
-  "short_name": "Thoughtline",
-  "description": "Speak your thoughts. Thoughtline sorts them into to-dos, ideas, and notes.",
+  "name": "Cerebrew",
+  "short_name": "Cerebrew",
+  "description": "Speak your thoughts. Cerebrew sorts them into to-dos, ideas, and notes.",
   "start_url": "/capture",
   "scope": "/",
   "display": "standalone",

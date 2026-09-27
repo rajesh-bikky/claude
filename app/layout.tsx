@@ -14,13 +14,13 @@ const displaySerif = EB_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Thoughtline",
-  description: "Speak your thoughts. Thoughtline sorts them into to-dos, ideas, and notes.",
+  title: "Cerebrew",
+  description: "Speak your thoughts. Cerebrew sorts them into to-dos, ideas, and notes.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Thoughtline",
+    title: "Cerebrew",
   },
   icons: {
     icon: [{ url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" }],
