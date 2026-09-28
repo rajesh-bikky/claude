@@ -1,17 +1,19 @@
-import { NextRequest, NextResponse } from "next/server";
-import { AUTH_COOKIE, isValidToken } from "@/lib/auth";
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 
+// /api/spinoffs* is excluded here — the local watcher script authenticates
+// with its own bearer-token secret instead of a Google session (see
+// app/api/spinoffs/route.ts and app/api/spinoffs/[id]/route.ts).
 export const config = {
-  matcher: ["/((?!login|_next/static|_next/image|favicon.ico|manifest.json|icons).*)"],
+  matcher: [
+    "/((?!login|api/auth|api/spinoffs|_next/static|_next/image|favicon.ico|manifest.json|icons).*)",
+  ],
 };
 
-export async function middleware(request: NextRequest) {
-  const token = request.cookies.get(AUTH_COOKIE)?.value;
-  if (await isValidToken(token)) {
-    return NextResponse.next();
+export default auth((req) => {
+  if (!req.auth) {
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("next", req.nextUrl.pathname);
+    return NextResponse.redirect(loginUrl);
   }
-
-  const loginUrl = new URL("/login", request.url);
-  loginUrl.searchParams.set("next", request.nextUrl.pathname);
-  return NextResponse.redirect(loginUrl);
-}
+});

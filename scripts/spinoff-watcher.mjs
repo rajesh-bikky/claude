@@ -5,7 +5,6 @@
 // Run manually with `node scripts/spinoff-watcher.mjs`, or on the Windows
 // scheduled task set up alongside this script.
 
-import { createHash } from "crypto";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 
@@ -13,16 +12,11 @@ const CEREBREW_URL = process.env.CEREBREW_URL ?? "https://cerebrew.vercel.app";
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? "C:\\Users\\Student\\Desktop\\Claude";
 const ENV_LOCAL_PATH = path.join(import.meta.dirname, "..", ".env.local");
 
-async function readAuthCode() {
+async function readWatcherSecret() {
   const envText = await readFile(ENV_LOCAL_PATH, "utf-8");
-  const match = envText.match(/^AUTH_CODE="?(\d{4})"?/m);
-  if (!match) throw new Error(`Could not find AUTH_CODE in ${ENV_LOCAL_PATH}`);
+  const match = envText.match(/^WATCHER_SECRET="?([^"\r\n]+)"?/m);
+  if (!match) throw new Error(`Could not find WATCHER_SECRET in ${ENV_LOCAL_PATH}`);
   return match[1];
-}
-
-async function authCookie(code) {
-  const digest = createHash("sha256").update(`cerebrew:${code}`).digest("hex");
-  return `cerebrew_auth=${digest}`;
 }
 
 function slugify(text) {
@@ -72,11 +66,11 @@ confirmed statement of intent.
 }
 
 async function main() {
-  const code = await readAuthCode();
-  const cookie = await authCookie(code);
+  const secret = await readWatcherSecret();
+  const authHeader = `Bearer ${secret}`;
 
   const res = await fetch(`${CEREBREW_URL}/api/spinoffs`, {
-    headers: { Cookie: cookie },
+    headers: { Authorization: authHeader },
   });
   if (!res.ok) {
     throw new Error(`GET /api/spinoffs failed: ${res.status} ${await res.text()}`);
@@ -93,10 +87,10 @@ async function main() {
     const folder = await uniqueFolder(PROJECTS_ROOT, slug);
     await writeFile(path.join(folder, "CLAUDE.md"), seedContent(entry), "utf-8");
 
-    const patchRes = await fetch(`${CEREBREW_URL}/api/entries/${entry.id}`, {
+    const patchRes = await fetch(`${CEREBREW_URL}/api/spinoffs/${entry.id}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({ spinoffStatus: "created", spinoffPath: folder }),
+      headers: { "Content-Type": "application/json", Authorization: authHeader },
+      body: JSON.stringify({ spinoffPath: folder }),
     });
     if (!patchRes.ok) {
       console.error(`Failed to mark ${entry.id} as created: ${patchRes.status}`);
