@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@google/genai": "^2.23.0",
+    "@libsql/client": "^0.18.0",
+    "@prisma/adapter-libsql": "^6.19.3",
     "@prisma/client": "^6.19.3",
     "next": "16.3.5",
     "react": "19.2.8",
@@ -31,6 +33,8 @@
     "@prisma/engines@6.19.3": true,
     "prisma@6.19.3": true,
     "@prisma/client@6.19.3": true,
-    "@google/genai@2.23.0": true
+    "@google/genai@2.23.0": true,
+    "protobufjs@7.6.6": true,
+    "unrs-resolver@1.12.2": true
   }
 }
