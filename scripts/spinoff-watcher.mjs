@@ -9,7 +9,7 @@ import { createHash } from "crypto";
 import { mkdir, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 
-const CEREBREW_URL = process.env.CEREBREW_URL ?? "http://localhost:3000";
+const CEREBREW_URL = process.env.CEREBREW_URL ?? "https://cerebrew.vercel.app";
 const PROJECTS_ROOT = process.env.PROJECTS_ROOT ?? "C:\\Users\\Student\\Desktop\\Claude";
 const ENV_LOCAL_PATH = path.join(import.meta.dirname, "..", ".env.local");
 
