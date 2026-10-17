@@ -4,8 +4,22 @@
     {
       "name": "cerebrew-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000
+    },
+    {
+      "name": "bitnit-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "bitnit",
+        "run",
+        "dev"
+      ],
+      "port": 3100
     }
   ]
 }
