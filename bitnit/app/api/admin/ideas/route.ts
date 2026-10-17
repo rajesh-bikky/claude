@@ -18,6 +18,7 @@ export async function POST(req: Request) {
     effortWeeks: Number(b.effortWeeks) > 0 ? Number(b.effortWeeks) : undefined,
     projection: b.projection,
     fromSuggestion: b.fromSuggestion,
+    goalId: b.goalId || undefined,
     createdAt: new Date().toISOString(),
   };
   const store = getStore();

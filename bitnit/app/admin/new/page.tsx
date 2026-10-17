@@ -6,7 +6,9 @@ import { Editor, type EditorInitial } from "./editor";
 export default async function NewBit({ searchParams }: PageProps<"/admin/new">) {
   await connection();
   const { from } = await searchParams;
-  const sug = typeof from === "string" ? getStore().suggestions.find((s) => s.id === from) : undefined;
+  const store = getStore();
+  const sug = typeof from === "string" ? store.suggestions.find((s) => s.id === from) : undefined;
+  const goals = store.goals.map((g) => ({ id: g.id, title: g.title }));
 
   const initial: EditorInitial = sug
     ? {
@@ -17,6 +19,7 @@ export default async function NewBit({ searchParams }: PageProps<"/admin/new">) 
         effortWeeks: sug.effortWeeks,
         projection: sug.projection,
         fromSuggestion: sug.id,
+        goalId: sug.goalId,
       }
     : {
         title: "",
@@ -30,10 +33,10 @@ export default async function NewBit({ searchParams }: PageProps<"/admin/new">) 
     <div className="shell">
       <Nav />
       <div style={{ margin: "12px 0 20px" }}>
-        {sug && <div className="eyebrow">From a suggested bit</div>}
+        {sug && <div className="eyebrow">From a scouted bit</div>}
         <h1 style={{ fontSize: 30, letterSpacing: "-0.02em", marginTop: 4 }}>{sug ? "Review and launch" : "New bit"}</h1>
       </div>
-      <Editor initial={initial} />
+      <Editor initial={initial} goals={goals} />
     </div>
   );
 }

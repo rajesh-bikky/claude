@@ -1,6 +1,6 @@
 import { json, preflight } from "@/lib/cors";
 import { getStore, save } from "@/lib/store";
-import { pickIdeaFor, whyYou } from "@/lib/targeting";
+import { pickIdeaFor, promptBudget, whyYou } from "@/lib/targeting";
 import type { HostUser } from "@/lib/types";
 
 export const OPTIONS = preflight;
@@ -22,12 +22,13 @@ export async function POST(req: Request) {
     featureUsage: user.featureUsage ?? {},
   };
 
-  const pick = pickIdeaFor(store.users[user.id], store);
-  if (!pick) {
+  const res = pickIdeaFor(store.users[user.id], store);
+  if (!res.pick) {
     save();
-    return json({ prompt: null });
+    return json({ prompt: null, reason: res.reason, budget: budgetOf(user.id) });
   }
-  store.impressions.push({ ideaId: pick.idea.id, userId: user.id, at: new Date().toISOString() });
+  const pick = res.pick;
+  if (!res.reShow) store.impressions.push({ ideaId: pick.idea.id, userId: user.id, at: new Date().toISOString() });
   save();
 
   return json({
@@ -39,5 +40,11 @@ export async function POST(req: Request) {
       whyYou: whyYou(pick.fit),
       fit: pick.fit.fit,
     },
+    budget: budgetOf(user.id),
   });
+
+  function budgetOf(id: string) {
+    const b = promptBudget(id, store);
+    return { used: b.used, cap: b.cap };
+  }
 }

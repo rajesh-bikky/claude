@@ -43,8 +43,10 @@ export type Idea = {
   effortWeeks?: number;
   /** The agent's projection when the bit was launched, kept to compare with reality. */
   projection?: Projection;
-  /** Set when the bit started life as an agent suggestion. */
+  /** Set when the bit started life as a scouted bit. */
   fromSuggestion?: string;
+  /** The product goal this bit is meant to move, if any. */
+  goalId?: string;
   createdAt: string;
 };
 
@@ -71,6 +73,9 @@ export type Suggestion = {
   projection: Projection;
   status: "pending" | "accepted" | "discarded";
   source: "claude" | "rules";
+  /** What the Scout noticed: friction against a goal, a usage pattern, or user feedback. */
+  origin: "goal" | "usage" | "feedback";
+  goalId?: string;
   createdAt: string;
 };
 
@@ -80,6 +85,8 @@ export type Response = {
   userId: string;
   answer: Answer;
   comment?: string;
+  /** The user agreed to be contacted about this bit — a discovery lead. */
+  contactOk?: boolean;
   /** Fit score and persona captured when the question was shown. */
   fit: number;
   persona: string;
@@ -99,4 +106,22 @@ export type Store = {
   responses: Response[];
   impressions: Impression[];
   suggestions: Suggestion[];
+  goals: Goal[];
+  settings: Settings;
+  lastScanAt?: string;
+};
+
+export type Goal = {
+  id: string;
+  title: string;
+  /** Key of a metric the connected analytics source can compute. */
+  metric: string;
+  /** Target value for the metric, 0..1. */
+  target: number;
+  createdAt: string;
+};
+
+export type Settings = {
+  /** Most distinct bits a single user is asked about in any 30-day window. */
+  maxBitsPer30d: number;
 };

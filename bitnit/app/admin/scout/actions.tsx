@@ -28,9 +28,9 @@ export function GenerateButton({ ai }: { ai: boolean }) {
           router.refresh();
         }}
       >
-        {busy ? "Analyzing product…" : "✨ Find new bits"}
+        {busy ? "Scanning…" : "✨ Scan now"}
       </button>
-      <span className="small faint">{msg || (ai ? "Claude reads usage, past bits and comments." : "Rules only — set ANTHROPIC_API_KEY to let Claude look.")}</span>
+      <span className="small faint">{msg || (ai ? "Claude reads goals, analytics, past bits and comments." : "Rules only — set ANTHROPIC_API_KEY to let Claude look.")}</span>
     </div>
   );
 }

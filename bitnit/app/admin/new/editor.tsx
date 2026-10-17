@@ -13,6 +13,7 @@ export type EditorInitial = Copy & {
   effortWeeks: number;
   projection?: Projection;
   fromSuggestion?: string;
+  goalId?: string;
 };
 
 type Audience = {
@@ -27,7 +28,7 @@ type Tightened = Copy & { notes: string[]; source: "claude" | "rules"; error?: s
 const FIELD_LABEL: Record<keyof Copy, string> = { title: "What is the idea?", problem: "What does it solve?", solution: "How does it solve it?" };
 const wordCount = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-export function Editor({ initial }: { initial: EditorInitial }) {
+export function Editor({ initial, goals }: { initial: EditorInitial; goals: { id: string; title: string }[] }) {
   const router = useRouter();
   const [copy, setCopy] = useState<Copy>({ title: initial.title, problem: initial.problem, solution: initial.solution });
   const [personas, setPersonas] = useState<string[]>(initial.targeting.personas);
@@ -45,6 +46,7 @@ export function Editor({ initial }: { initial: EditorInitial }) {
   const [projection, setProjection] = useState<Projection | null>(initial.projection ?? null);
   const [projecting, setProjecting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [goalId, setGoalId] = useState(initial.goalId ?? "");
 
   const targeting: Targeting = {
     personas,
@@ -109,6 +111,7 @@ export function Editor({ initial }: { initial: EditorInitial }) {
         effortWeeks,
         projection: projection && !stale ? projection : undefined,
         fromSuggestion: initial.fromSuggestion,
+        goalId,
       }),
     });
     const idea = await res.json();
@@ -250,6 +253,14 @@ export function Editor({ initial }: { initial: EditorInitial }) {
               <strong className="num" style={{ width: 44 }}>{threshold}%</strong>
             </div>
           </label>
+          {goals.length > 0 && (
+            <label className="field">Moves which goal?
+              <select className="input" value={goalId} onChange={(e) => setGoalId(e.target.value)}>
+                <option value="">None</option>
+                {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+              </select>
+            </label>
+          )}
           <div className="grid cols-2">
             <label className="field">Target sample size
               <input className="input num" type="number" min={10} value={targetSample} onChange={(e) => setTargetSample(Number(e.target.value))} />

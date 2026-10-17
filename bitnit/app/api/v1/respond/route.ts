@@ -8,7 +8,7 @@ export const OPTIONS = preflight;
 const ANSWERS: Answer[] = ["need", "maybe", "nah"];
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as { ideaId?: string; userId?: string; answer?: Answer; comment?: string };
+  const body = (await req.json()) as { ideaId?: string; userId?: string; answer?: Answer; comment?: string; contactOk?: boolean };
   const store = getStore();
   const idea = store.ideas.find((i) => i.id === body.ideaId);
   const user = body.userId ? store.users[body.userId] : undefined;
@@ -22,6 +22,7 @@ export async function POST(req: Request) {
     // A follow-up comment, or a changed mind — keep one response per person.
     existing.answer = body.answer;
     if (comment) existing.comment = comment;
+    if (body.contactOk) existing.contactOk = true;
   } else {
     store.responses.push({
       id: newId("r"),
@@ -29,6 +30,7 @@ export async function POST(req: Request) {
       userId: user.id,
       answer: body.answer,
       comment,
+      contactOk: body.contactOk || undefined,
       fit: scoreFit(user, idea.targeting).fit,
       persona: user.persona,
       createdAt: new Date().toISOString(),

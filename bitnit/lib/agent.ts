@@ -4,11 +4,12 @@
 import { z } from "zod";
 import { askClaude, withFallback } from "./ai";
 import { FEATURES, PERSONAS, PRODUCT_NAME, featureLabel, personaLabel } from "./catalog";
+import { describeFriction, funnel, type Funnel } from "./analytics";
 import { COPY_LIMITS, type Copy } from "./copy";
 import { newId } from "./id";
 import { analyze } from "./stats";
 import { scoreFit } from "./targeting";
-import type { Idea, Projection, Store, Suggestion, Targeting } from "./types";
+import type { Goal, Idea, Projection, Store, Suggestion, Targeting } from "./types";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
@@ -193,7 +194,7 @@ export async function projectOutcome(bit: Copy & { targeting: Targeting; buildTh
 }
 
 // ---------------------------------------------------------------------------
-// Suggested bits
+// The Scout: scouted bits
 // ---------------------------------------------------------------------------
 
 /** Aggregate usage the agent reasons over: per persona, share using each feature and median uses. */
@@ -212,13 +213,113 @@ export function usageProfile(store: Store) {
 
 type Draft = Omit<Suggestion, "id" | "projection" | "status" | "createdAt" | "source">;
 
-/** Rule-based ideas: patterns in usage and in what users wrote. Used without Claude. */
+type GoalTemplate = Pick<Draft, "title" | "problem" | "solution" | "effortWeeks"> & {
+  features: Targeting["features"];
+  minTenureDays?: number;
+  /** Comment text that, if a user wrote it, backs this bit up. */
+  echo?: RegExp;
+};
+
+// What the Scout proposes for the weakest step of each goal funnel (rules mode).
+const GOAL_PLAYBOOK: Record<string, GoalTemplate[]> = {
+  paid_on_time: [
+    {
+      title: "Invoice delivery by text message",
+      problem: "Invoices sent by email get buried, so clients don't open them until they're overdue.",
+      solution: "Also send each invoice as a text message with a link, and show when it's been opened.",
+      features: [{ feature: "invoices", minUses: 5 }],
+      effortWeeks: 2,
+    },
+    {
+      title: "Pay-now button on invoices",
+      problem: "Clients who open an invoice still have to arrange a bank transfer, so payment waits.",
+      solution: "Every invoice gets a Pay now button: clients pay by card or bank link in one step.",
+      features: [{ feature: "invoices", minUses: 5 }],
+      effortWeeks: 4,
+      echo: /card|pay now|online pay/i,
+    },
+  ],
+  activation: [
+    {
+      title: "Import clients from a spreadsheet",
+      problem: "New users have to type in every client by hand before they can send anything.",
+      solution: "Upload a CSV or connect your email contacts; Ledgerly creates the client list for you.",
+      features: [],
+      minTenureDays: 0,
+      effortWeeks: 2,
+    },
+    {
+      title: "Start from a sample invoice",
+      problem: "A blank invoice is daunting, so new users stop before finishing their first one.",
+      solution: "Begin from a pre-filled sample invoice you edit, with your details already in place.",
+      features: [],
+      minTenureDays: 0,
+      effortWeeks: 1,
+    },
+    {
+      title: "Send a test invoice to yourself",
+      problem: "New users aren't sure what clients will see, so first invoices sit unsent as drafts.",
+      solution: "Send the invoice to yourself first and see exactly what your client will receive.",
+      features: [],
+      minTenureDays: 0,
+      effortWeeks: 0.5,
+    },
+  ],
+  month_close: [
+    {
+      title: "Expense categorization rules",
+      problem: "Categorizing the same vendors' expenses by hand every month is slow and error-prone.",
+      solution: "Create rules like “Uber → Travel” that categorize matching expenses automatically.",
+      features: [{ feature: "expenses", minUses: 5 }],
+      effortWeeks: 2,
+    },
+    {
+      title: "One-click bank reconciliation",
+      problem: "Matching categorized expenses to bank lines takes an afternoon at every month-end.",
+      solution: "Connect your bank; Ledgerly matches transactions to expenses and flags only the leftovers.",
+      features: [{ feature: "expenses", minUses: 5 }],
+      effortWeeks: 6,
+    },
+  ],
+};
+
+/** Friction against each goal, as the Scout sees it. */
+export function goalSignals(store: Store) {
+  return store.goals
+    .map((g) => ({ goal: g, f: funnel(g.metric, store) }))
+    .filter((x): x is { goal: Goal; f: Funnel } => Boolean(x.f?.friction));
+}
+
+/** Rule-based scouting: goal friction first, then usage patterns and what users wrote. */
 function ruleSuggestions(store: Store): Draft[] {
-  const prof = usageProfile(store);
-  const get = (p: string, f: string) => prof.find((x) => x.persona === p)!.features.find((x) => x.feature === f)!;
   const comments = store.responses.filter((r) => r.comment).map((r) => r.comment!);
   const quote = (re: RegExp) => comments.find((c) => re.test(c));
   const out: Draft[] = [];
+
+  for (const { goal, f } of goalSignals(store)) {
+    const x = f.friction!;
+    const tpl = GOAL_PLAYBOOK[goal.metric]?.[x.stepIndex];
+    if (!tpl) continue;
+    const echo = tpl.echo ? quote(tpl.echo) : undefined;
+    out.push({
+      title: tpl.title,
+      problem: tpl.problem,
+      solution: tpl.solution,
+      effortWeeks: tpl.effortWeeks,
+      targeting: { personas: [x.persona], features: tpl.features, minTenureDays: tpl.minTenureDays ?? 14, minFit: 0.4 },
+      origin: "goal",
+      goalId: goal.id,
+      rationale: `“${x.from} → ${x.to}” is the weakest step toward your goal “${goal.title}”.`,
+      evidence: [
+        describeFriction(f),
+        `${f.metric.label} is ${pct(f.value)} against a ${pct(goal.target)} target.`,
+        ...(echo ? [`A user wrote: “${echo}”`] : []),
+      ],
+    });
+  }
+
+  const prof = usageProfile(store);
+  const get = (p: string, ft: string) => prof.find((x) => x.persona === p)!.features.find((x) => x.feature === ft)!;
 
   const rates = quote(/rate/i);
   if (rates) {
@@ -229,6 +330,7 @@ function ruleSuggestions(store: Store): Draft[] {
       solution: "Set a rate on each project or team member; tracked time is priced automatically on invoices.",
       targeting: { personas: ["agency", "freelancer"], features: [{ feature: "time_tracking", minUses: 10 }], minTenureDays: 14, minFit: 0.45 },
       effortWeeks: 3,
+      origin: "feedback",
       rationale: "Users raised it unprompted while answering a related bit.",
       evidence: [`A user wrote: “${rates}”`, `${pct(a.share)} of agency owners track time (median ${a.median}×/mo).`],
     });
@@ -241,21 +343,9 @@ function ruleSuggestions(store: Store): Draft[] {
       solution: "Edit the wording of each reminder step, with a preview, and pick a tone per client.",
       targeting: { personas: ["freelancer", "agency", "smb"], features: [{ feature: "invoices", minUses: 10 }], minTenureDays: 14, minFit: 0.45 },
       effortWeeks: 1,
+      origin: "feedback",
       rationale: "A follow-on to the strongest-demand bit; users asked for control over it.",
       evidence: [`A user wrote: “${tone}”`],
-    });
-  }
-  const acc = get("accountant", "expenses");
-  const accR = get("accountant", "reports");
-  if (acc.share > 0.5 && accR.share > 0.5) {
-    out.push({
-      title: "Expense categorization rules",
-      problem: "Categorizing the same vendors' expenses by hand every month is slow and error-prone.",
-      solution: "Create rules like “Uber → Travel” that categorize matching expenses automatically.",
-      targeting: { personas: ["accountant", "smb"], features: [{ feature: "expenses", minUses: 10 }], minTenureDays: 30, minFit: 0.45 },
-      effortWeeks: 2,
-      rationale: "Accountants are the heaviest expense and report users — repetitive categorization sits between the two.",
-      evidence: [`${pct(acc.share)} of accountants use Expenses (median ${acc.median}×/mo) and ${pct(accR.share)} use Reports (median ${accR.median}×/mo).`],
     });
   }
   const cp = get("agency", "client_portal");
@@ -266,6 +356,7 @@ function ruleSuggestions(store: Store): Draft[] {
       solution: "Clients approve or question a draft invoice in the portal before it's issued.",
       targeting: { personas: ["agency"], features: [{ feature: "client_portal", minUses: 8 }], minTenureDays: 30, minFit: 0.5 },
       effortWeeks: 4,
+      origin: "usage",
       rationale: "Agency owners lean on the client portal far more than other personas.",
       evidence: [`${pct(cp.share)} of agency owners use the Client portal (median ${cp.median}×/mo).`],
     });
@@ -277,6 +368,7 @@ function ruleSuggestions(store: Store): Draft[] {
     solution: "Set an invoice to repeat on a schedule; Ledgerly creates and sends each one automatically.",
     targeting: { personas: ["smb", "freelancer"], features: [{ feature: "invoices", minUses: 8 }], minTenureDays: 30, minFit: 0.4 },
     effortWeeks: 2,
+    origin: "usage",
     rationale: "Invoicing is the most-used feature for small-business owners and freelancers.",
     evidence: [`${pct(smb.share)} of small-business owners invoice (median ${smb.median}×/mo).`],
   });
@@ -293,6 +385,8 @@ const SuggestSchema = z.object({
       features: z.array(z.object({ feature: z.string(), minUses: z.number() })),
       minTenureDays: z.number(),
       effortWeeks: z.number(),
+      origin: z.enum(["goal", "usage", "feedback"]),
+      goalId: z.string(),
       rationale: z.string(),
       evidence: z.array(z.string()),
     }),
@@ -303,6 +397,16 @@ async function claudeSuggestions(store: Store): Promise<Draft[]> {
   const prof = usageProfile(store)
     .map((p) => `${personaLabel(p.persona)} (${p.users} users): ` + p.features.map((f) => `${f.feature} used by ${pct(f.share)}, median ${f.median}×/mo`).join("; "))
     .join("\n");
+  const goals = goalSignals(store)
+    .map(
+      ({ goal, f }) =>
+        `- [${goal.id}] ${goal.title} — ${f.metric.label} is ${pct(f.value)}, target ${pct(goal.target)}. Funnel: ` +
+        f.steps.map((st, i) => (i === 0 ? `${st.label} ${st.count}` : `${st.label} ${pct(st.rate)}`)).join(" → ") +
+        `. By persona: ` +
+        f.byPersona.map((bp) => `${personaLabel(bp.persona)} ${bp.rates.map(pct).join("/")}`).join("; ") +
+        `. Weakest: ${describeFriction(f)}`,
+    )
+    .join("\n");
   const existing = store.ideas.map((i) => `- ${i.title} [${i.status}${i.decision ? `, decided ${i.decision.verdict}` : ""}]`).join("\n");
   const pending = store.suggestions.filter((s) => s.status !== "accepted").map((s) => `- ${s.title} [${s.status}]`).join("\n");
 
@@ -310,16 +414,22 @@ async function claudeSuggestions(store: Store): Promise<Draft[]> {
     schema: SuggestSchema,
     effort: "medium",
     system:
-      `You are the product-discovery agent inside ${PRODUCT_NAME}, an invoicing and bookkeeping app for small businesses. ` +
-      "Propose small, concrete features worth validating with users, grounded in the usage data and in what users have said. " +
-      "Every suggestion must cite specific evidence from the data you were given — no generic SaaS ideas. " +
+      `You are the Scout, the product-discovery agent inside ${PRODUCT_NAME}, an invoicing and bookkeeping app for small businesses. ` +
+      "Your job is to find what stops users getting value toward the builder's goals, and propose small, concrete features worth validating with users. " +
+      "Prioritize the weakest funnel steps of the goals and the personas hit hardest; also use usage patterns and what users have written. " +
+      "Every suggestion must cite specific numbers or quotes from the data you were given — no generic SaaS ideas. " +
       "Skip anything already listed as a bit or a previous suggestion, and avoid features similar to ones users rejected. " +
       `Use only these persona keys: ${Object.keys(PERSONAS).join(", ")}; and these feature keys: ${Object.keys(FEATURES).join(", ")}. ` +
       `Write copy that is short and neutral: title ≤ ${COPY_LIMITS.title} words, problem and solution ≤ ${COPY_LIMITS.problem} words each, no marketing adjectives. ` +
+      "origin is goal, usage, or feedback; goalId is the bracketed goal id for goal-driven suggestions, otherwise an empty string. " +
       "minUses is the monthly usage of that feature a user needs to be asked. effortWeeks is a rough engineering estimate. Propose 4 suggestions.",
-    prompt: `Usage by persona (last 30 days):\n${prof}\n\nBits so far and how users answered:\n${history(store) || "(none)"}\n\nAll bit titles:\n${existing}\n\nPrevious suggestions:\n${pending || "(none)"}`,
+    prompt:
+      `Product goals and their funnels (last 30 days):\n${goals || "(no goals set)"}\n\n` +
+      `Usage by persona (last 30 days):\n${prof}\n\nBits so far and how users answered:\n${history(store) || "(none)"}\n\n` +
+      `All bit titles:\n${existing}\n\nPrevious suggestions:\n${pending || "(none)"}`,
   });
 
+  const goalIds = new Set(store.goals.map((g) => g.id));
   return out.suggestions.map((s) => ({
     title: s.title,
     problem: s.problem,
@@ -331,6 +441,8 @@ async function claudeSuggestions(store: Store): Promise<Draft[]> {
       minFit: 0.45,
     },
     effortWeeks: Math.max(0.5, Math.round(s.effortWeeks * 2) / 2),
+    origin: s.origin,
+    goalId: goalIds.has(s.goalId) ? s.goalId : undefined,
     rationale: s.rationale,
     evidence: s.evidence,
   }));
@@ -338,9 +450,13 @@ async function claudeSuggestions(store: Store): Promise<Draft[]> {
 
 const DEFAULT_BAR = 0.35;
 
-/** Generate fresh suggestions, project each, and add them to the review queue. */
-export async function generateSuggestions(store: Store): Promise<{ added: Suggestion[]; source: "claude" | "rules"; error?: string }> {
-  const taken = new Set([...store.ideas.map((i) => i.title.toLowerCase()), ...store.suggestions.map((s) => s.title.toLowerCase())]);
+function takenTitles(store: Store) {
+  return new Set([...store.ideas.map((i) => i.title.toLowerCase()), ...store.suggestions.map((s) => s.title.toLowerCase())]);
+}
+
+/** Scan goals, usage and feedback for new bits, project each, and queue them for review. */
+export async function scout(store: Store): Promise<{ added: Suggestion[]; source: "claude" | "rules"; error?: string }> {
+  const taken = takenTitles(store);
   const res = await withFallback(() => claudeSuggestions(store), () => ruleSuggestions(store));
   const fresh = res.value.filter((d) => !taken.has(d.title.toLowerCase()));
 
@@ -350,21 +466,35 @@ export async function generateSuggestions(store: Store): Promise<{ added: Sugges
     added.push({ ...d, id: newId("sug"), projection, status: "pending", source: res.source, createdAt: new Date().toISOString() });
   }
   store.suggestions.unshift(...added);
+  store.lastScanAt = new Date().toISOString();
   return { added, source: res.source, error: res.error };
 }
 
-/** Synchronous, rules-only variant used when building the sample data. */
-export function seedSuggestions(store: Store) {
-  for (const d of ruleSuggestions(store)) {
-    store.suggestions.push({
+/** Synchronous, rules-only scan — for the sample data and the daily background pass. */
+export function scoutWithRules(store: Store) {
+  const taken = takenTitles(store);
+  const added: Suggestion[] = ruleSuggestions(store)
+    .filter((d) => !taken.has(d.title.toLowerCase()))
+    .map((d) => ({
       ...d,
       id: newId("sug"),
       projection: priorProjection(d.targeting, DEFAULT_BAR, store),
       status: "pending",
       source: "rules",
       createdAt: new Date().toISOString(),
-    });
-  }
+    }));
+  store.suggestions.unshift(...added);
+  store.lastScanAt = new Date().toISOString();
+  return added;
+}
+
+const DAY = 86400000;
+
+/** Keep scouting without anyone pressing a button: a rules pass whenever the last scan is a day old. */
+export function scoutIfStale(store: Store) {
+  if (store.lastScanAt && Date.now() - Date.parse(store.lastScanAt) < DAY) return false;
+  scoutWithRules(store);
+  return true;
 }
 
 export { priorProjection };

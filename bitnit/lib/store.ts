@@ -14,6 +14,8 @@ export function getStore(): Store {
   try {
     g.__bitnit = JSON.parse(fs.readFileSync(FILE, "utf8")) as Store;
     g.__bitnit.suggestions ??= [];
+    g.__bitnit.goals ??= [];
+    g.__bitnit.settings ??= { maxBitsPer30d: 3 };
   } catch {
     g.__bitnit = buildSeed();
     save();

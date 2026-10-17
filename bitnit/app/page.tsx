@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "./logo";
 import { Nav } from "./nav";
 
 export default function Home() {
@@ -6,7 +7,8 @@ export default function Home() {
     <div className="shell">
       <Nav />
       <section style={{ padding: "48px 0 32px", maxWidth: 720 }}>
-        <div className="eyebrow">Build it or Nix it</div>
+        <Logo size={72} title="BITNIT" />
+        <div className="eyebrow" style={{ marginTop: 16 }}>Build it or Nix it</div>
         <h1 style={{ fontSize: 44, letterSpacing: "-0.03em", margin: "10px 0 14px" }}>
           With AI, building is cheap. Deciding is the hard part.
         </h1>

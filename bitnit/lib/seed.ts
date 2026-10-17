@@ -1,8 +1,8 @@
 // Synthetic Ledgerly customers and a few ideas at different stages, so the
 // admin side has something to analyze on first run. Deterministic (seeded RNG).
 
-import { priorProjection, seedSuggestions } from "./agent";
-import { scoreFit } from "./targeting";
+import { priorProjection, scoutWithRules } from "./agent";
+import { promptBudget, scoreFit } from "./targeting";
 import { DEMO_USERS } from "./demo-users";
 import type { Answer, HostUser, Idea, Store } from "./types";
 
@@ -169,7 +169,18 @@ export function buildSeed(): Store {
     },
   ];
 
-  const store: Store = { users: {}, ideas: [], responses: [], impressions: [], suggestions: [] };
+  const store: Store = {
+    users: {},
+    ideas: [],
+    responses: [],
+    impressions: [],
+    suggestions: [],
+    goals: [
+      { id: "goal_paid", title: "Get paid on time", metric: "paid_on_time", target: 0.7, createdAt: daysAgo(40) },
+      { id: "goal_activate", title: "New users send an invoice in week one", metric: "activation", target: 0.5, createdAt: daysAgo(40) },
+    ],
+    settings: { maxBitsPer30d: 3 },
+  };
   for (const u of [...users, ...DEMO_USERS]) store.users[u.id] = u;
 
   let rid = 0;
@@ -184,6 +195,8 @@ export function buildSeed(): Store {
     for (const { u, f } of pool) {
       if (store.responses.filter((x) => x.ideaId === idea.id).length >= _want) break;
       const at = daysAgo(r() * ageDays);
+      // History respects the frequency cap too.
+      if (promptBudget(u.id, store, Date.parse(at)).remaining === 0) continue;
       // About a third of people who see the question dismiss it.
       if (r() < 0.32) {
         store.impressions.push({ ideaId: idea.id, userId: u.id, at, dismissed: true });
@@ -202,23 +215,46 @@ export function buildSeed(): Store {
     }
   }
 
-  const comments: Record<string, string[]> = {
-    "auto-chase": ["I spend Friday afternoons on this. Please.", "Would pay extra for this on its own.", "Let me edit the tone of the reminders."],
-    "time-to-invoice": ["I already export to a spreadsheet, it's fine.", "Only if it handles different rates per project."],
-    "crypto-payouts": ["None of my clients would accept this.", "Compliance nightmare for us."],
-    payroll: ["We use Gusto and it works fine.", "Would never move payroll into my invoicing app."],
+  // What people wrote in the optional "tell us more" box, matched to how they answered.
+  const comments: Record<string, [Answer, string, boolean?][]> = {
+    "auto-chase": [
+      ["need", "I spend Friday afternoons chasing payments. This would give me that time back.", true],
+      ["need", "Would pay extra for this on its own."],
+      ["need", "Let me edit the tone of the reminders — some clients are friends.", true],
+      ["maybe", "Only if I can switch it off for my biggest client."],
+      ["nah", "I'd rather you let clients pay by card straight from the invoice."],
+    ],
+    "time-to-invoice": [
+      ["maybe", "I already export to a spreadsheet, it's fine."],
+      ["maybe", "Only if it handles different rates per project.", true],
+      ["need", "Every Friday I copy hours across by hand.", true],
+      ["nah", "My time and my invoices are in different tools anyway."],
+    ],
+    "crypto-payouts": [
+      ["nah", "None of my clients would accept this."],
+      ["nah", "Compliance nightmare for us."],
+      ["nah", "What I need is online card payments, not crypto."],
+    ],
+    payroll: [
+      ["nah", "We use Gusto and it works fine."],
+      ["nah", "Would never move payroll into my invoicing app."],
+    ],
+    "receipt-snap": [["need", "Receipts fade before I get to them.", true]],
   };
   for (const [ideaId, list] of Object.entries(comments)) {
-    const rs = store.responses.filter((x) => x.ideaId === ideaId);
-    list.forEach((c, i) => {
-      const target = rs[i * 7];
-      if (target) target.comment = c;
-    });
+    const used = new Set<string>();
+    for (const [answer, text, contact] of list) {
+      const target = store.responses.find((x) => x.ideaId === ideaId && x.answer === answer && !used.has(x.id));
+      if (!target) continue;
+      used.add(target.id);
+      target.comment = text;
+      if (contact) target.contactOk = true;
+    }
   }
   // What the agent would have projected for the newer bits, from the history before them.
   for (const idea of store.ideas.filter((i) => i.id === "time-to-invoice" || i.id === "receipt-snap")) {
     idea.projection = priorProjection(idea.targeting, idea.buildThreshold, store, idea.id);
   }
-  seedSuggestions(store);
+  scoutWithRules(store);
   return store;
 }

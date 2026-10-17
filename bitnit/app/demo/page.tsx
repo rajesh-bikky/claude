@@ -6,11 +6,12 @@ import { FEATURES, personaLabel } from "@/lib/catalog";
 import { DEMO_USERS } from "@/lib/demo-users";
 
 type Prompt = { title: string; fit: number } | null;
+type Meta = { reason?: "capped" | "no-fit"; budget?: { used: number; cap: number } };
 type Bitnit = {
   init: (o: {
     user: unknown;
     accent?: string;
-    onDecide?: (p: Prompt) => void;
+    onDecide?: (p: Prompt, meta: Meta) => void;
     onAnswer?: (a: { answer: string }) => void;
   }) => Promise<Prompt>;
   destroy: () => void;
@@ -37,13 +38,18 @@ export default function Demo() {
     B.init({
       user,
       accent: "#4b3fd1",
-      onDecide: (p) =>
+      onDecide: (p, meta) => {
+        const first = user.name.split(" ")[0];
+        const b = meta.budget ? ` · ${meta.budget.used}/${meta.budget.cap} bits this month` : "";
         setLog(
           p
-            ? `BITNIT → asking ${user.name.split(" ")[0]} about “${p.title}” (fit ${p.fit.toFixed(2)})`
-            : `BITNIT stayed quiet — no unanswered live idea fits ${user.name}.`,
-        ),
-      onAnswer: ({ answer }) => setLog(`BITNIT ← ${user.name.split(" ")[0]} answered “${answer}”. Reload as them to get the next idea.`),
+            ? `BITNIT → asking ${first} about “${p.title}” (fit ${p.fit.toFixed(2)})${b}`
+            : meta.reason === "capped"
+              ? `BITNIT stayed quiet — ${first} hit the ${meta.budget?.cap}-bits-per-30-days cap.`
+              : `BITNIT stayed quiet — no unanswered live bit fits ${user.name}.`,
+        );
+      },
+      onAnswer: ({ answer }) => setLog(`BITNIT ← ${user.name.split(" ")[0]} answered “${answer}”. Click “Ask again” for their next bit.`),
     });
   }, [user]);
 

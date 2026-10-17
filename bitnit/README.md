@@ -11,9 +11,11 @@ npm run dev   # http://localhost:3100
 |---|---|
 | `/demo` | **Ledgerly**, a fictional invoicing app with the widget embedded. Switch between demo users to see who gets asked what. |
 | `/admin` | Dashboard: eng-weeks saved by nixed bits, the pipeline (suggested → draft → collecting → ready → building / nixed), bits in progress. |
-| `/admin/suggested` | Bits the agent proposes from usage patterns and user comments, each with a projected result. Edit & launch, or discard. |
+| `/admin/goals` | Product goals measured against the connected analytics source: current value vs target, the funnel, and where users get stuck. |
+| `/admin/scout` | Scouted bits: drafts the Scout writes from goal friction, user feedback and usage patterns, each with evidence and a projected result. Edit & launch, or discard. |
+| `/admin/settings` | Frequency cap: the most bits one user is asked about in 30 days (default 3). |
 | `/admin/new` | Write a bit (what / solves / how) with word-count and leading-language checks, ✨ Tighten with AI, a live preview of the real widget, and the agent's projection. |
-| `/admin/ideas/[id]` | Recommendation, stats, persona split, best-fit vs rest, comments, preview, projected-vs-actual, controls. |
+| `/admin/ideas/[id]` | Recommendation, stats, persona split, best-fit vs rest, Discovery (follow-up notes and an interview list), preview, projected-vs-actual, controls. |
 
 ## How it decides
 
@@ -34,7 +36,12 @@ Set `ANTHROPIC_API_KEY` (see `.env.example`) to use Claude (`claude-opus-5-5`, s
 
 - **Tighten with AI** — opt-in, never automatic. It rewrites for brevity and neutrality without adding claims, and the builder accepts each field or keeps theirs. Leading copy inflates "badly need it" and corrupts the decision, so neutrality matters as much as length.
 - **Projection** — a statistical prior first: past bits weighted by how much their audience overlaps this one (Jaccard on eligible users), with the weighted spread as an ~80% range. Claude then adjusts for the idea's wording and past comments. The projection is stored at launch and compared with the actual result.
-- **Suggested bits** — Claude reads per-persona usage, past bits and their outcomes, and comments, then proposes bits with cited evidence, targeting and an effort estimate. The rules fallback looks for recurring comment themes and usage concentrations.
+- **The Scout** — measures each goal in analytics (`lib/analytics.ts`, a deterministic demo source standing in for Segment/Amplitude/Mixpanel), finds the weakest funnel step and the persona hit hardest, and drafts bits for it. Claude also weighs usage, past bits and comments; the rules fallback uses a playbook per funnel step plus comment and usage patterns. A rules scan runs whenever the last one is a day old; "Scan now" runs the full pass. In production the daily scan would be a cron job.
+
+## Respecting users
+
+- **Frequency cap.** A user is asked about at most N distinct bits in any 30 days (`promptBudget` in `lib/targeting.ts`). Re-showing an unanswered card doesn't spend budget; dismissing does.
+- **Tell us more.** After answering, each person gets the follow-up that is most useful for that answer (need: "What would you use it for first?", maybe: "What would make it a definite yes?", won't use: "What would you rather we build instead?") plus an opt-in to be contacted. These feed the Discovery panel and the Scout.
 
 ## Embedding in another product
 
@@ -55,4 +62,4 @@ The widget renders in a Shadow DOM so host CSS can't touch it. `BITNIT.preview(c
 
 - Storage is a JSON file (`data/store.json`, seeded with ~320 synthetic Ledgerly users on first run). Use a real database before production.
 - The admin console and API have no auth, and `/api/v1` trusts whatever user traits the host sends — a real deployment needs per-product API keys and signed user payloads.
-- No frequency cap beyond "one answer per idea per user".
+- Only the demo analytics source is real; the other sources on the Goals page mark where integrations would go.

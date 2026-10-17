@@ -63,9 +63,8 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 /* ---------- BITNIT chrome ---------- */
 .shell { max-width: 1120px; margin: 0 auto; padding: 0 16px 64px; }
-.nav { display: flex; align-items: center; gap: 20px; padding: 18px 0; }
+.nav { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 20px; padding: 18px 0; }
 .brand { font-weight: 800; letter-spacing: -0.02em; font-size: 18px; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-.brand .mark { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--ink); color: var(--bg); font-size: 13px; }
 .nav a.link { text-decoration: none; color: var(--ink-2); font-size: 14px; }
 .nav a.link:hover { color: var(--ink); }
 .nav .spacer { flex: 1; }

@@ -5,11 +5,19 @@ import { featureLabel, personaLabel } from "@/lib/catalog";
 import { projectionVsActual } from "@/lib/agent";
 import { analyze } from "@/lib/stats";
 import { getStore } from "@/lib/store";
+import type { Answer } from "@/lib/types";
 import { audience } from "@/lib/targeting";
 import { Nav } from "../../../nav";
 import { ANSWER_META, AnswerStack, IntervalBar, Legend, ProjectionView, pct, verdictIcon, verdictLabel } from "../../viz";
 import { WidgetPreview } from "../../widget-preview";
 import { IdeaControls } from "./controls";
+
+// Mirrors the follow-up questions the widget asks after each answer.
+const FOLLOW_UP: Record<Answer, string> = {
+  need: "What would you use it for first?",
+  maybe: "What would make it a definite yes?",
+  nah: "What would you rather we build instead?",
+};
 
 const fmtP = (p: number) => (p < 0.001 ? "< 0.001" : p.toFixed(3));
 
@@ -25,8 +33,10 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
   const comments = store.responses
     .filter((r) => r.ideaId === idea.id && r.comment)
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
+  const leads = store.responses.filter((r) => r.ideaId === idea.id && r.contactOk);
   const t = idea.targeting;
   const pva = projectionVsActual(idea, store);
+  const goal = store.goals.find((g) => g.id === idea.goalId);
 
   return (
     <div className="shell">
@@ -37,6 +47,7 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
             <span className={`pill ${idea.status}`}>{idea.status}</span>
             {idea.decision && <span className={`pill ${idea.decision.verdict}`}>Decided: {idea.decision.verdict}</span>}
+            {goal && <Link href="/admin/goals" className="pill inconclusive" style={{ textDecoration: "none" }}>◎ {goal.title}</Link>}
           </div>
           <h1 style={{ fontSize: 30, letterSpacing: "-0.02em" }}>{idea.title}</h1>
         </div>
@@ -201,19 +212,43 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
             </div>
           </section>
 
-          <section className="card">
-            <h2 style={{ fontSize: 16, marginBottom: 10 }}>In their words <span className="faint small">({comments.length})</span></h2>
-            {comments.length === 0 && <p className="small faint" style={{ margin: 0 }}>No comments yet.</p>}
-            <div className="grid" style={{ gap: 10 }}>
-              {comments.slice(0, 12).map((c) => (
-                <figure key={c.id} style={{ margin: 0, paddingLeft: 12, borderLeft: `3px solid ${ANSWER_META[c.answer].color}` }}>
-                  <blockquote style={{ margin: 0 }}>“{c.comment}”</blockquote>
-                  <figcaption className="small faint">
-                    {ANSWER_META[c.answer].emoji} {ANSWER_META[c.answer].label} · {personaLabel(c.persona)} · fit {c.fit.toFixed(2)}
-                  </figcaption>
-                </figure>
-              ))}
+          <section className="card grid" style={{ gap: 14 }}>
+            <div>
+              <h2 style={{ fontSize: 16 }}>Discovery <span className="faint small">({comments.length} notes · {leads.length} open to a chat)</span></h2>
+              <p className="small muted" style={{ margin: "4px 0 0" }}>What people wrote in the optional follow-up, grouped by the question each answer gets.</p>
             </div>
+            {comments.length === 0 && <p className="small faint" style={{ margin: 0 }}>No notes yet.</p>}
+            {(Object.keys(FOLLOW_UP) as Answer[]).map((ans) => {
+              const notes = comments.filter((c) => c.answer === ans);
+              if (!notes.length) return null;
+              return (
+                <div key={ans} className="grid" style={{ gap: 8 }}>
+                  <div className="small" style={{ fontWeight: 600 }}>{ANSWER_META[ans].emoji} {FOLLOW_UP[ans]}</div>
+                  {notes.slice(0, 8).map((c) => (
+                    <figure key={c.id} style={{ margin: 0, paddingLeft: 12, borderLeft: `3px solid ${ANSWER_META[c.answer].color}` }}>
+                      <blockquote style={{ margin: 0 }}>“{c.comment}”</blockquote>
+                      <figcaption className="small faint">
+                        {store.users[c.userId]?.name ?? "A user"} · {personaLabel(c.persona)} · fit {c.fit.toFixed(2)}
+                        {c.contactOk && <span style={{ color: "var(--good)" }}> · ✓ open to a chat</span>}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              );
+            })}
+            {leads.length > 0 && (
+              <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12 }}>
+                <div className="eyebrow" style={{ marginBottom: 6 }}>Interview list</div>
+                <div className="grid" style={{ gap: 4 }}>
+                  {leads.map((c) => (
+                    <div key={c.id} className="small" style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                      <span>{store.users[c.userId]?.name ?? c.userId} <span className="faint">· {personaLabel(c.persona)}</span></span>
+                      <span>{ANSWER_META[c.answer].emoji} {ANSWER_META[c.answer].label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         </div>
       </div>

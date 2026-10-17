@@ -80,30 +80,54 @@ export function whyYou(fit: FitResult): string {
 
 export type Pick = { idea: Idea; fit: FitResult };
 
+const WINDOW_MS = 30 * 86400000;
+
+/**
+ * How much of the user's 30-day question budget is spent. A bit counts once,
+ * however many times its card is re-shown, so reloads don't burn the budget.
+ */
+export function promptBudget(userId: string, store: Store, now = Date.now()) {
+  const recent = store.impressions.filter((i) => i.userId === userId && now - Date.parse(i.at) < WINDOW_MS);
+  const ideas = new Set(recent.map((i) => i.ideaId));
+  const cap = store.settings.maxBitsPer30d;
+  return { used: ideas.size, cap, remaining: Math.max(0, cap - ideas.size), recentIdeas: ideas };
+}
+
+export type PickResult = { pick: Pick; reShow: boolean } | { pick: null; reason: "capped" | "no-fit" };
+
 /**
  * The agent's choice: of the live ideas this user hasn't already answered or
  * dismissed, ask about the one they fit best — nudged toward ideas that are
  * furthest from their target sample, so evidence accumulates where it's missing.
+ * Once the 30-day budget is spent, only a bit already shown (and not yet
+ * answered) can appear again.
  */
-export function pickIdeaFor(user: HostUser, store: Store): Pick | null {
+export function pickIdeaFor(user: HostUser, store: Store): PickResult {
   const seen = new Set(
     store.impressions
       .filter((i) => i.userId === user.id && i.dismissed)
       .map((i) => i.ideaId)
       .concat(store.responses.filter((r) => r.userId === user.id).map((r) => r.ideaId)),
   );
+  const budget = promptBudget(user.id, store);
 
   let best: { pick: Pick; score: number } | null = null;
+  let blockedByCap = false;
   for (const idea of store.ideas) {
     if (idea.status !== "live" || seen.has(idea.id)) continue;
     const fit = scoreFit(user, idea.targeting);
     if (!fit.eligible) continue;
+    if (budget.remaining === 0 && !budget.recentIdeas.has(idea.id)) {
+      blockedByCap = true;
+      continue;
+    }
     const collected = store.responses.filter((r) => r.ideaId === idea.id).length;
     const deficit = clamp01(1 - collected / idea.targetSample);
     const score = fit.fit * 0.75 + deficit * 0.25;
     if (!best || score > best.score) best = { pick: { idea, fit }, score };
   }
-  return best?.pick ?? null;
+  if (best) return { pick: best.pick, reShow: budget.recentIdeas.has(best.pick.idea.id) };
+  return { pick: null, reason: blockedByCap ? "capped" : "no-fit" };
 }
 
 /** How many known users the targeting would reach — shown while drafting an idea. */

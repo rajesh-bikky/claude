@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { analyze, type Analysis } from "@/lib/stats";
-import { getStore } from "@/lib/store";
+import { scoutIfStale } from "@/lib/agent";
+import { getStore, save } from "@/lib/store";
 import type { Idea } from "@/lib/types";
 import { Nav } from "../nav";
 import { ResetButton } from "./reset-button";
@@ -14,6 +15,7 @@ const weeks = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(1)} eng-week
 export default async function Dashboard() {
   await connection();
   const store = getStore();
+  if (scoutIfStale(store)) save();
   const rows: Row[] = store.ideas.map((idea) => ({ idea, a: analyze(idea, store.responses, store.impressions) }));
 
   const suggested = store.suggestions.filter((s) => s.status === "pending");
@@ -31,7 +33,7 @@ export default async function Dashboard() {
   const avoidedVotes = nixed.reduce((s, r) => s + r.a.counts.nah, 0);
 
   const stages = [
-    { label: "Suggested", n: suggested.length, href: "/admin/suggested", hint: "awaiting review" },
+    { label: "Scouted", n: suggested.length, href: "/admin/scout", hint: "awaiting review" },
     { label: "Draft", n: drafts.length, href: "#in-progress", hint: "not launched" },
     { label: "Collecting", n: collecting.length, href: "#in-progress", hint: "asking users" },
     { label: "Ready to call", n: ready.length, href: "#in-progress", hint: "significant" },
@@ -95,11 +97,11 @@ export default async function Dashboard() {
       </nav>
 
       {suggested.length > 0 && (
-        <Link href="/admin/suggested" className="card" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", marginBottom: 24 }}>
+        <Link href="/admin/scout" className="card" style={{ display: "flex", alignItems: "center", gap: 12, textDecoration: "none", marginBottom: 24 }}>
           <span style={{ fontSize: 22 }} aria-hidden>✨</span>
           <span style={{ flex: 1 }}>
-            <strong>{suggested.length} suggested bit{suggested.length === 1 ? "" : "s"}</strong>
-            <span className="muted"> from patterns in usage and feedback — {suggested.slice(0, 3).map((s) => s.title).join(", ")}{suggested.length > 3 ? "…" : ""}</span>
+            <strong>{suggested.length} scouted bit{suggested.length === 1 ? "" : "s"}</strong>
+            <span className="muted"> from your goals, analytics and feedback — {suggested.slice(0, 3).map((s) => s.title).join(", ")}{suggested.length > 3 ? "…" : ""}</span>
           </span>
           <span className="btn">Review →</span>
         </Link>
@@ -125,7 +127,8 @@ export default async function Dashboard() {
                   <Link href={`/admin/ideas/${idea.id}`} style={{ fontWeight: 600, textDecoration: "none" }}>{idea.title}</Link>
                   <div className="small faint" style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 2 }}>
                     <span className={`pill ${idea.status}`} style={{ padding: "1px 7px" }}>{idea.status}</span>
-                    {idea.fromSuggestion && <span>✨ agent-suggested</span>}
+                    {idea.fromSuggestion && <span>✨ scouted</span>}
+                    {idea.goalId && <span>◎ {store.goals.find((g) => g.id === idea.goalId)?.title}</span>}
                   </div>
                 </td>
                 <td className="num">{a.n}<span className="faint"> / {idea.targetSample}</span></td>
