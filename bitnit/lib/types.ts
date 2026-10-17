@@ -39,6 +39,38 @@ export type Idea = {
   /** Responses we aim to collect before calling it. */
   targetSample: number;
   decision?: { verdict: "build" | "nix"; note: string; at: string };
+  /** Builder's estimate of engineering effort, used to report what a "nix" saved. */
+  effortWeeks?: number;
+  /** The agent's projection when the bit was launched, kept to compare with reality. */
+  projection?: Projection;
+  /** Set when the bit started life as an agent suggestion. */
+  fromSuggestion?: string;
+  createdAt: string;
+};
+
+export type Projection = {
+  /** Projected share answering "badly need it". */
+  needRate: number;
+  low: number;
+  high: number;
+  likely: "build" | "nix" | "uncertain";
+  basis: string[];
+  risks: string[];
+  source: "claude" | "prior";
+};
+
+export type Suggestion = {
+  id: string;
+  title: string;
+  problem: string;
+  solution: string;
+  targeting: Targeting;
+  effortWeeks: number;
+  rationale: string;
+  evidence: string[];
+  projection: Projection;
+  status: "pending" | "accepted" | "discarded";
+  source: "claude" | "rules";
   createdAt: string;
 };
 
@@ -66,4 +98,5 @@ export type Store = {
   ideas: Idea[];
   responses: Response[];
   impressions: Impression[];
+  suggestions: Suggestion[];
 };

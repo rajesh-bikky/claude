@@ -15,10 +15,15 @@ export async function POST(req: Request) {
     targeting: b.targeting,
     buildThreshold: Math.min(0.9, Math.max(0.05, Number(b.buildThreshold) || 0.35)),
     targetSample: Math.max(10, Math.round(Number(b.targetSample) || 100)),
+    effortWeeks: Number(b.effortWeeks) > 0 ? Number(b.effortWeeks) : undefined,
+    projection: b.projection,
+    fromSuggestion: b.fromSuggestion,
     createdAt: new Date().toISOString(),
   };
   const store = getStore();
   store.ideas.unshift(idea);
+  const sug = store.suggestions.find((s) => s.id === b.fromSuggestion);
+  if (sug) sug.status = "accepted";
   save();
   return Response.json(idea);
 }

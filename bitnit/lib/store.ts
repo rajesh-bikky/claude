@@ -13,6 +13,7 @@ export function getStore(): Store {
   if (g.__bitnit) return g.__bitnit;
   try {
     g.__bitnit = JSON.parse(fs.readFileSync(FILE, "utf8")) as Store;
+    g.__bitnit.suggestions ??= [];
   } catch {
     g.__bitnit = buildSeed();
     save();
@@ -35,4 +36,4 @@ export function resetStore() {
   return g.__bitnit;
 }
 
-export const newId = (prefix: string) => `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+export { newId } from "./id";

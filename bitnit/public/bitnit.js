@@ -11,6 +11,9 @@
  *
  * BITNIT decides whether this user is a good fit for any live idea. If not,
  * nothing is shown.
+ *
+ * BITNIT.preview(container, prompt) renders the same card inline, without
+ * recording anything — used by the builder console.
  */
 (function () {
   var scriptOrigin = (function () {
@@ -54,7 +57,8 @@
     ".acts{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}" +
     ".btn{all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px}" +
     ".primary{background:var(--accent);color:#fff}.ghost{color:#6b6a65}.ghost:hover{background:#f2f1ee}" +
-    ".done{text-align:center;padding:8px 0 4px}.done span{font-size:28px;display:block;margin-bottom:4px}";
+    ".done{text-align:center;padding:8px 0 4px}.done span{font-size:28px;display:block;margin-bottom:4px}" +
+    ".card.inline{position:relative;right:auto;bottom:auto;width:100%;max-width:340px;z-index:auto;animation:none}";
 
   var state = null;
 
@@ -84,21 +88,47 @@
   function destroy() {
     if (state && state.host) state.host.remove();
     if (state && state.timer) clearTimeout(state.timer);
+    if (state && state.ctx && state.ctx.timer) clearTimeout(state.ctx.timer);
     state = null;
   }
 
-  function render(prompt) {
+  /** Render a prompt inline for previewing. Answers loop back to the question; nothing is sent. */
+  function preview(container, prompt, opts) {
+    var ctx = {
+      inline: container,
+      accent: (opts && opts.accent) || "#2a78d6",
+      send: function () {},
+      finish: function () {
+        if (ctx.timer) clearTimeout(ctx.timer);
+        container.replaceChildren();
+        render(prompt, ctx);
+      },
+    };
+    container.replaceChildren();
+    render(prompt, ctx);
+    return function stop() {
+      if (ctx.timer) clearTimeout(ctx.timer);
+      container.replaceChildren();
+    };
+  }
+
+  // ctx: { accent, send(path, body), finish(), inline }
+  function render(prompt, ctx) {
     var host = el("div", { "data-bitnit": "" });
     var root = host.attachShadow({ mode: "open" });
     root.appendChild(el("style", { text: CSS }));
-    var card = el("div", { class: "card", role: "dialog", "aria-label": "Help decide what gets built" });
-    card.style.setProperty("--accent", state.accent);
+    var card = el("div", {
+      class: ctx.inline ? "card inline" : "card",
+      role: ctx.inline ? "group" : "dialog",
+      "aria-label": "Help decide what gets built",
+    });
+    card.style.setProperty("--accent", ctx.accent);
     root.appendChild(card);
-    document.body.appendChild(host);
-    state.host = host;
+    (ctx.inline || document.body).appendChild(host);
+    var destroy = ctx.finish;
 
     function close() {
-      post("/api/v1/dismiss", { ideaId: prompt.ideaId, userId: state.user.id });
+      ctx.send("/api/v1/dismiss", { ideaId: prompt.ideaId });
       destroy();
     }
 
@@ -109,7 +139,7 @@
           el("div", { class: "q", text: "Thanks — that helps us decide." }),
         ]),
       );
-      state.timer = setTimeout(destroy, 2200);
+      ctx.timer = setTimeout(destroy, 2200);
     }
 
     function followUp(answer) {
@@ -130,24 +160,24 @@
             class: "btn primary",
             text: "Send",
             onclick: function () {
-              if (ta.value.trim()) post("/api/v1/respond", { ideaId: prompt.ideaId, userId: state.user.id, answer: answer.key, comment: ta.value });
+              if (ta.value.trim()) ctx.send("/api/v1/respond", { ideaId: prompt.ideaId, answer: answer.key, comment: ta.value });
               thanks(answer);
             },
           }),
         ]),
       );
-      ta.focus();
+      if (!ctx.inline) ta.focus();
     }
 
     function choose(answer) {
-      post("/api/v1/respond", { ideaId: prompt.ideaId, userId: state.user.id, answer: answer.key });
-      if (state.onAnswer) state.onAnswer({ ideaId: prompt.ideaId, answer: answer.key });
+      ctx.send("/api/v1/respond", { ideaId: prompt.ideaId, answer: answer.key });
+      if (ctx.onAnswer) ctx.onAnswer({ ideaId: prompt.ideaId, answer: answer.key });
       followUp(answer);
     }
 
     var tag = el("div", { class: "tag" });
     tag.append(el("b", { text: "Build it or nix it?" }), document.createTextNode(" · 10 sec"));
-    card.append(
+    [
       el("div", { class: "top" }, [tag, el("button", { class: "x", "aria-label": "Not now", text: "×", onclick: close })]),
       el("h3", { text: prompt.title }),
       el("dl", {}, [
@@ -156,7 +186,7 @@
         el("dt", { text: "How it solves it" }),
         el("dd", { text: prompt.solution }),
       ]),
-      el("div", { class: "why", text: prompt.whyYou }),
+      prompt.whyYou ? el("div", { class: "why", text: prompt.whyYou }) : null,
       el("div", { class: "q", text: "Would you use this?" }),
       el(
         "div",
@@ -167,7 +197,10 @@
           return b;
         }),
       ),
-    );
+    ].forEach(function (n) {
+      if (n) card.appendChild(n);
+    });
+    return host;
   }
 
   function init(opts) {
@@ -186,11 +219,22 @@
       if (mine.onDecide) mine.onDecide(res.prompt);
       if (!res.prompt) return null;
       mine.timer = setTimeout(function () {
-        if (state === mine) render(res.prompt);
+        if (state !== mine) return;
+        var ctx = {
+          accent: mine.accent,
+          onAnswer: mine.onAnswer,
+          send: function (path, body) {
+            body.userId = mine.user.id;
+            return post(path, body);
+          },
+          finish: destroy,
+        };
+        mine.host = render(res.prompt, ctx);
+        mine.ctx = ctx;
       }, opts.delayMs == null ? 600 : opts.delayMs);
       return res.prompt;
     });
   }
 
-  window.BITNIT = { init: init, destroy: destroy };
+  window.BITNIT = { init: init, destroy: destroy, preview: preview };
 })();

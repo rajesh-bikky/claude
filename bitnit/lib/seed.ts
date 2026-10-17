@@ -1,6 +1,7 @@
 // Synthetic Ledgerly customers and a few ideas at different stages, so the
 // admin side has something to analyze on first run. Deterministic (seeded RNG).
 
+import { priorProjection, seedSuggestions } from "./agent";
 import { scoreFit } from "./targeting";
 import { DEMO_USERS } from "./demo-users";
 import type { Answer, HostUser, Idea, Store } from "./types";
@@ -70,6 +71,7 @@ export function buildSeed(): Store {
   const ideas: (Idea & { _model?: ResponseModel; _want?: number })[] = [
     {
       id: "auto-chase",
+      effortWeeks: 3,
       title: "Auto-chase overdue invoices",
       problem: "Chasing late payments is awkward, manual and easy to forget — so cash shows up weeks late.",
       solution: "Ledgerly sends polite, escalating reminders on a schedule you choose and stops the moment the client pays.",
@@ -83,6 +85,7 @@ export function buildSeed(): Store {
     },
     {
       id: "time-to-invoice",
+      effortWeeks: 2,
       title: "One-click invoice from tracked time",
       problem: "Turning a week of time entries into an invoice means copying hours line by line.",
       solution: "Pick a client and date range; Ledgerly groups the tracked hours into a ready-to-send invoice.",
@@ -96,6 +99,7 @@ export function buildSeed(): Store {
     },
     {
       id: "crypto-payouts",
+      effortWeeks: 8,
       title: "Pay contractors in crypto",
       problem: "Paying international contractors involves slow wires and FX fees.",
       solution: "Send contractor payouts in USDC straight from Ledgerly, with the transaction logged as an expense.",
@@ -109,6 +113,7 @@ export function buildSeed(): Store {
     },
     {
       id: "receipt-snap",
+      effortWeeks: 5,
       title: "Snap-a-receipt expense capture",
       problem: "Receipts pile up in wallets and inboxes until month-end, then get lost.",
       solution: "Photograph a receipt on your phone; Ledgerly reads the amount, vendor and date and files the expense.",
@@ -122,6 +127,7 @@ export function buildSeed(): Store {
     },
     {
       id: "accountant-workspace",
+      effortWeeks: 10,
       title: "Multi-client workspace for accountants",
       problem: "Accountants juggle a separate login for every client's books.",
       solution: "One workspace that lists all your clients' Ledgerly books, with switching and roll-up reports.",
@@ -131,9 +137,39 @@ export function buildSeed(): Store {
       targetSample: 60,
       createdAt: daysAgo(1),
     },
+    {
+      id: "payroll",
+      effortWeeks: 16,
+      title: "Built-in payroll",
+      problem: "Paying employees means a separate payroll tool and re-entering numbers into the books.",
+      solution: "Run payroll inside Ledgerly, with payslips, tax withholding and automatic bookkeeping entries.",
+      status: "decided",
+      decision: { verdict: "nix", note: "Users already have payroll providers they trust.", at: daysAgo(40) },
+      targeting: { personas: ["smb", "agency"], features: [], minTenureDays: 30, minFit: 0.3 },
+      buildThreshold: 0.3,
+      targetSample: 80,
+      createdAt: daysAgo(70),
+      _model: model(0.04, 0.08, 0.35),
+      _want: 84,
+    },
+    {
+      id: "templates",
+      effortWeeks: 2,
+      title: "Invoice template gallery",
+      problem: "Default invoices look generic, and building a branded one from scratch takes too long.",
+      solution: "Pick from a gallery of professional templates and apply your logo and colours in one step.",
+      status: "decided",
+      decision: { verdict: "build", note: "", at: daysAgo(30) },
+      targeting: { personas: ["freelancer", "agency", "smb"], features: [{ feature: "invoices", minUses: 3 }], minTenureDays: 7, minFit: 0.35 },
+      buildThreshold: 0.3,
+      targetSample: 100,
+      createdAt: daysAgo(55),
+      _model: model(0.15, 0.35, 0.5),
+      _want: 104,
+    },
   ];
 
-  const store: Store = { users: {}, ideas: [], responses: [], impressions: [] };
+  const store: Store = { users: {}, ideas: [], responses: [], impressions: [], suggestions: [] };
   for (const u of [...users, ...DEMO_USERS]) store.users[u.id] = u;
 
   let rid = 0;
@@ -170,6 +206,7 @@ export function buildSeed(): Store {
     "auto-chase": ["I spend Friday afternoons on this. Please.", "Would pay extra for this on its own.", "Let me edit the tone of the reminders."],
     "time-to-invoice": ["I already export to a spreadsheet, it's fine.", "Only if it handles different rates per project."],
     "crypto-payouts": ["None of my clients would accept this.", "Compliance nightmare for us."],
+    payroll: ["We use Gusto and it works fine.", "Would never move payroll into my invoicing app."],
   };
   for (const [ideaId, list] of Object.entries(comments)) {
     const rs = store.responses.filter((x) => x.ideaId === ideaId);
@@ -178,5 +215,10 @@ export function buildSeed(): Store {
       if (target) target.comment = c;
     });
   }
+  // What the agent would have projected for the newer bits, from the history before them.
+  for (const idea of store.ideas.filter((i) => i.id === "time-to-invoice" || i.id === "receipt-snap")) {
+    idea.projection = priorProjection(idea.targeting, idea.buildThreshold, store, idea.id);
+  }
+  seedSuggestions(store);
   return store;
 }

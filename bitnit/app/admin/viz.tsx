@@ -1,5 +1,5 @@
 import type { Analysis, Verdict } from "@/lib/stats";
-import type { Answer } from "@/lib/types";
+import type { Answer, Projection } from "@/lib/types";
 
 export const ANSWER_META: Record<Answer, { label: string; emoji: string; color: string }> = {
   need: { label: "Badly need it", emoji: "🔥", color: "var(--need)" },
@@ -111,6 +111,35 @@ export function IntervalBar({ a, compact = false }: { a: Pick<Analysis, "need" |
           <span className="small faint" style={{ position: "absolute", right: 0, bottom: -20 }}>100%</span>
         </>
       )}
+    </div>
+  );
+}
+
+const LIKELY = {
+  build: { label: "Likely build", cls: "build" },
+  nix: { label: "Likely nix", cls: "nix" },
+  uncertain: { label: "Could go either way", cls: "inconclusive" },
+} as const;
+
+/** The agent's forecast: a range, not a result. Drawn on the same track as real results. */
+export function ProjectionView({ p, bar }: { p: Projection; bar: number }) {
+  const l = LIKELY[p.likely];
+  return (
+    <div className="grid" style={{ gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 24, fontWeight: 800 }} className="num">~{pct(p.needRate)}</span>
+        <span className="small muted num">likely range {pct(p.low)}–{pct(p.high)}</span>
+        <span className={`pill ${l.cls}`}>{l.label}</span>
+      </div>
+      <IntervalBar a={{ need: { p: p.needRate, lo: p.low, hi: p.high }, threshold: bar, n: 1 }} />
+      <ul className="small muted" style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 4 }}>
+        {p.basis.map((b) => <li key={b}>{b}</li>)}
+        {p.risks.map((r) => <li key={r} style={{ color: "var(--warning)" }}>Risk: {r}</li>)}
+      </ul>
+      <div className="small faint">
+        {p.source === "claude" ? "Forecast by Claude from your history and this bit’s wording." : "Statistical prior from past answers only — it can’t read the idea itself."}
+        {" "}A forecast, not a result: launch to measure.
+      </div>
     </div>
   );
 }

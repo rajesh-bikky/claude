@@ -10,9 +10,10 @@ npm run dev   # http://localhost:3100
 | Route | What it is |
 |---|---|
 | `/demo` | **Ledgerly**, a fictional invoicing app with the widget embedded. Switch between demo users to see who gets asked what. |
-| `/admin` | Builder console: every idea, its answers, need-rate interval vs the build bar, and the call. |
-| `/admin/ideas/[id]` | Recommendation, stats, persona split, best-fit vs rest, comments, targeting, controls. |
-| `/admin/new` | Draft an idea (what / solves / how), set targeting and the decision rule, see reachable audience live. |
+| `/admin` | Dashboard: eng-weeks saved by nixed bits, the pipeline (suggested → draft → collecting → ready → building / nixed), bits in progress. |
+| `/admin/suggested` | Bits the agent proposes from usage patterns and user comments, each with a projected result. Edit & launch, or discard. |
+| `/admin/new` | Write a bit (what / solves / how) with word-count and leading-language checks, ✨ Tighten with AI, a live preview of the real widget, and the agent's projection. |
+| `/admin/ideas/[id]` | Recommendation, stats, persona split, best-fit vs rest, comments, preview, projected-vs-actual, controls. |
 
 ## How it decides
 
@@ -27,6 +28,14 @@ npm run dev   # http://localhost:3100
 
 Secondary signals feed the narrative: one-sided p-value vs the bar, fit-weighted need rate, best-fit half vs the rest (two-proportion z-test), persona × answer χ² test, a high 🤷 share, and low response rates (non-response bias).
 
+## The agent layer (`lib/agent.ts`)
+
+Set `ANTHROPIC_API_KEY` (see `.env.example`) to use Claude (`claude-opus-5-5`, structured output). Without it every feature falls back to rules and says so in the UI.
+
+- **Tighten with AI** — opt-in, never automatic. It rewrites for brevity and neutrality without adding claims, and the builder accepts each field or keeps theirs. Leading copy inflates "badly need it" and corrupts the decision, so neutrality matters as much as length.
+- **Projection** — a statistical prior first: past bits weighted by how much their audience overlaps this one (Jaccard on eligible users), with the weighted spread as an ~80% range. Claude then adjusts for the idea's wording and past comments. The projection is stored at launch and compared with the actual result.
+- **Suggested bits** — Claude reads per-persona usage, past bits and their outcomes, and comments, then proposes bits with cited evidence, targeting and an effort estimate. The rules fallback looks for recurring comment themes and usage concentrations.
+
 ## Embedding in another product
 
 ```html
@@ -40,7 +49,7 @@ Secondary signals feed the narrative: one-sided p-value vs the bar, fit-weighted
 </script>
 ```
 
-The widget renders in a Shadow DOM so host CSS can't touch it. The public API (`/api/v1/prompt`, `/respond`, `/dismiss`) is CORS-open.
+The widget renders in a Shadow DOM so host CSS can't touch it. `BITNIT.preview(container, prompt)` renders the same card inline without recording anything; the console uses it for previews. The public API (`/api/v1/prompt`, `/respond`, `/dismiss`) is CORS-open.
 
 ## Prototype limits
 

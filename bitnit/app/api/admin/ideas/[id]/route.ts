@@ -14,6 +14,7 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/admin/ideas/[i
   }
   if (b.buildThreshold !== undefined) idea.buildThreshold = Math.min(0.9, Math.max(0.05, Number(b.buildThreshold)));
   if (b.targetSample !== undefined) idea.targetSample = Math.max(10, Math.round(Number(b.targetSample)));
+  if (b.effortWeeks !== undefined) idea.effortWeeks = Math.max(0, Number(b.effortWeeks)) || undefined;
   if (b.decide) {
     idea.status = "decided";
     idea.decision = { verdict: b.decide.verdict, note: b.decide.note ?? "", at: new Date().toISOString() };

@@ -2,11 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { featureLabel, personaLabel } from "@/lib/catalog";
+import { projectionVsActual } from "@/lib/agent";
 import { analyze } from "@/lib/stats";
 import { getStore } from "@/lib/store";
 import { audience } from "@/lib/targeting";
 import { Nav } from "../../../nav";
-import { ANSWER_META, AnswerStack, IntervalBar, Legend, pct, verdictIcon, verdictLabel } from "../../viz";
+import { ANSWER_META, AnswerStack, IntervalBar, Legend, ProjectionView, pct, verdictIcon, verdictLabel } from "../../viz";
+import { WidgetPreview } from "../../widget-preview";
 import { IdeaControls } from "./controls";
 
 const fmtP = (p: number) => (p < 0.001 ? "< 0.001" : p.toFixed(3));
@@ -24,11 +26,12 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
     .filter((r) => r.ideaId === idea.id && r.comment)
     .sort((x, y) => y.createdAt.localeCompare(x.createdAt));
   const t = idea.targeting;
+  const pva = projectionVsActual(idea, store);
 
   return (
     <div className="shell">
       <Nav />
-      <Link href="/admin" className="small muted" style={{ textDecoration: "none" }}>← All ideas</Link>
+      <Link href="/admin" className="small muted" style={{ textDecoration: "none" }}>← Dashboard</Link>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: 16, flexWrap: "wrap", margin: "10px 0 20px" }}>
         <div style={{ maxWidth: 640 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
@@ -148,24 +151,25 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
 
         <div className="grid">
           <section className="card">
-            <div className="eyebrow" style={{ marginBottom: 10 }}>What targeted users see</div>
-            <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, background: "var(--bg)" }}>
-              <div className="eyebrow" style={{ color: "var(--ink)" }}>Build it or nix it? · 10 sec</div>
-              <h3 style={{ fontSize: 17, margin: "8px 0 10px" }}>{idea.title}</h3>
-              <div className="eyebrow">What it solves</div>
-              <p style={{ margin: "2px 0 8px" }}>{idea.problem}</p>
-              <div className="eyebrow">How it solves it</div>
-              <p style={{ margin: "2px 0 12px" }}>{idea.solution}</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-                {Object.values(ANSWER_META).map((m) => (
-                  <div key={m.label} style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "8px 4px", textAlign: "center", fontSize: 12 }}>
-                    <div style={{ fontSize: 22 }}>{m.emoji}</div>
-                    {m.label}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>Preview · what targeted users see</div>
+            <WidgetPreview
+              prompt={{ ideaId: idea.id, title: idea.title, problem: idea.problem, solution: idea.solution, whyYou: aud.sample?.whyYou }}
+              caption={aud.sample ? `Shown as ${aud.sample.name}, your best-fit user (fit ${aud.sample.fit.toFixed(2)}). Nothing is recorded.` : "Nothing is recorded."}
+            />
           </section>
+
+          {idea.projection && (
+            <section className="card">
+              <div className="eyebrow" style={{ marginBottom: 8 }}>Projected at launch{pva ? " vs actual" : ""}</div>
+              {pva && (
+                <p className="small" style={{ margin: "0 0 10px", color: pva.inside ? "var(--good)" : "var(--warning)" }}>
+                  {pva.inside ? "✓" : "⚠"} Actual {pct(pva.actual)} landed {pva.inside ? "inside" : "outside"} the projected range
+                  {pva.inside ? "." : " — the agent's prior for this audience was off; worth a look at why."}
+                </p>
+              )}
+              <ProjectionView p={idea.projection} bar={idea.buildThreshold} />
+            </section>
+          )}
 
           <section className="card">
             <h2 style={{ fontSize: 16, marginBottom: 10 }}>Who gets asked</h2>
@@ -182,6 +186,8 @@ export default async function IdeaPage({ params }: PageProps<"/admin/ideas/[id]"
               <dd style={{ margin: 0 }}>≥ {t.minTenureDays} days</dd>
               <dt className="muted">Min fit score</dt>
               <dd style={{ margin: 0 }}>{t.minFit.toFixed(2)}</dd>
+              <dt className="muted">Build effort</dt>
+              <dd style={{ margin: 0 }}>{idea.effortWeeks ? `${idea.effortWeeks} eng-weeks` : "Not estimated"}</dd>
             </dl>
             <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)" }}>
               <div style={{ fontSize: 22, fontWeight: 800 }} className="num">

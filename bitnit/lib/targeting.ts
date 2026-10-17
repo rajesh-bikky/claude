@@ -110,7 +110,10 @@ export function pickIdeaFor(user: HostUser, store: Store): Pick | null {
 export function audience(t: Targeting, users: HostUser[]) {
   const scored = users.map((u) => ({ u, f: scoreFit(u, t) }));
   const eligible = scored.filter((s) => s.f.eligible);
+  const best = eligible.reduce<(typeof eligible)[number] | null>((b, s) => (!b || s.f.fit > b.f.fit ? s : b), null);
   return {
+    /** The best-fit user, so previews can show the personalised line they'd see. */
+    sample: best ? { name: best.u.name, persona: best.u.persona, fit: best.f.fit, whyYou: whyYou(best.f) } : null,
     total: users.length,
     eligible: eligible.length,
     avgFit: eligible.length ? eligible.reduce((a, s) => a + s.f.fit, 0) / eligible.length : 0,
